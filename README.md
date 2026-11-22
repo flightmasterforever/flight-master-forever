@@ -40,7 +40,6 @@ A static site, about 7 MB: no server code, no database, no build step needed to 
 | `src/test-hook.js` | one line that exposes the app's internals to the tests (test build only) |
 | `build.py` | builds `docs/index.html` from `src/` |
 | `test/` | the route and UI tests |
-| `addon/FlightMasterDump/` | the in-game addon used to record real flight routes and check the booking rule |
 | `brand/` | the favicon and faction logo sources (and the earlier S-curve design) |
 | `data-tools/` | the script and intermediate files used to turn wago.tools exports into flight data (reference) |
 | `LICENSES/OpenMap-MIT.txt` | OpenMap's licence, for the dock, sailing-path and entrance positions |
@@ -95,8 +94,7 @@ Expect `problems 0` for both factions.
 When Blizzard patches Forever, the flight data may change. The data in `src/gdata.js` was built from the game's
 own tables (TaxiNodes, TaxiPath, TaxiPathNode, UiMap, UiMapAssignment and the map art tables) for the build named
 in the About notes, read through wago.tools. `data-tools/` holds the script and files used for that, as a
-reference. To check flights against the game itself, install `addon/FlightMasterDump`, open a flight master in game,
-and the routes the game offers are saved to `WTF/Account/<account>/SavedVariables/FlightMasterDump.lua`.
+reference.
 
 ## Credits
 
