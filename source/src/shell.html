@@ -225,6 +225,44 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
 #dock svg{width:18px;height:18px}
 .mitlic summary{cursor:pointer;color:var(--acc,var(--gold));margin-top:4px}.mitlic pre{white-space:pre-wrap;font-size:11.5px;line-height:1.45;background:var(--tint,rgba(0,0,0,.05));padding:10px 12px;border-radius:8px;margin:6px 0 0}
 .share{display:flex;justify-content:flex-end;padding:8px 16px 0}.share .linkbtn{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+
+/* phones: the panel is a bottom sheet (see "phone layout" in the app). Pulled down it shows From/To and the chosen
+   route; pulled up, the steps, the other options, then your character folded into one row */
+.grab,.chartog,.sheetmore{display:none}
+@media (max-width:700px){
+  .card{display:flex;flex-direction:column;max-height:calc(100% - 64px);box-shadow:0 -6px 24px rgba(0,0,0,.35);overscroll-behavior:contain}
+  .card>*{flex:none}
+  .card.peek{overflow:hidden;max-height:62%}
+  .card.full{height:calc(100% - 64px)}
+  .card.dragging{overflow:hidden}
+  .card .head{order:0;touch-action:none;cursor:grab;padding-top:16px}
+  .grab{display:block;position:absolute;top:5px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:rgba(255,255,255,.55)}
+  .fields{order:1}#routes{order:2}.sheetmore{order:3}.share{order:4}.charbar{order:5}.foot{order:6}.fan{order:7}
+  #routes{padding:0 10px}
+  .card.peek .rcard:not([aria-current]),.card.peek ol.steps,.card.peek .share,.card.peek .charbar,.card.peek .foot,.card.peek .fan{display:none}
+  .card.peek .rcard[aria-current]{cursor:pointer}
+  .sheetmore{display:none;margin:2px auto 8px;border:0;background:none;color:var(--acc,var(--gold));font:inherit;font-size:14px;font-weight:600;padding:10px 16px;min-height:44px;cursor:pointer}
+  .card.peek .sheetmore{display:block}
+  .charh{display:none}
+  .chartog{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;text-align:left;font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--rule);border-radius:12px;padding:12px 14px;min-height:56px;cursor:pointer}
+  .chartog small{display:block;color:var(--mute);font-size:13px;margin-top:1px}
+  .chartog svg{flex:none;color:var(--mute);transition:transform .15s}
+  .charbar.open .chartog{border-radius:12px 12px 0 0;border-bottom-color:transparent}
+  .charbar.open .chartog svg{transform:rotate(180deg)}
+  .charbar:not(.open) #charP{display:none}
+  .charbar.open #charP{border-radius:0 0 12px 12px}
+  body.sheetfull .ctl{display:none}
+  /* touch sizes: at least 40-44px to tap, and 16px text in fields so iPhones don't zoom in */
+  .field .x,.charp .field .x{width:40px;height:40px;margin-top:-20px;right:2px}
+  .charp .field input{font-size:16px;min-height:44px}
+  .charp .seg button,.row.mage .seg button{min-height:40px;min-width:40px}
+  .charp label.row{min-height:44px}
+  .charp input[type=checkbox]{width:22px;height:22px}
+  .linkbtn{padding:12px 0}
+  .pop{right:68px!important}
+}
+/* short screens (phones on their side): the legend would cover most of the map */
+@media (max-height:500px){.legend{display:none}}
 </style>
 </head>
 <body class="docked">
@@ -232,6 +270,7 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
 
 <section class="card" aria-label="Route planner">
   <div class="head">
+    <span class="grab" aria-hidden="true"></span>
     <h1><img class="logo la" src="logo-alliance.svg" alt="" width="36" height="36"><img class="logo lh" src="logo-horde.svg" alt="" width="36" height="36"><span>Flight Master: Forever</span></h1>
     <div class="crests" role="group" aria-label="Faction"><button id="fA" aria-pressed="true" aria-label="Alliance" title="Alliance"><img src="icons/crest-alliance.png" alt=""></button><button id="fH" aria-pressed="false" aria-label="Horde" title="Horde"><img src="icons/crest-horde.png" alt=""></button></div>
   </div>
@@ -245,6 +284,7 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
   </div>
   <div class="charbar">
     <div class="charh">Your character <span>optional</span></div>
+    <button class="chartog" id="charTog" aria-expanded="false" aria-controls="charP"><span><b>Your character</b><small id="charSum"></small></span><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg></button>
     <div class="charp" id="charP">
       <div class="sub">Hearthstone</div>
       <div class="field hf"><input id="hearthIn" placeholder="Not set · search your inn" autocomplete="off" role="combobox" aria-label="Hearthstone location" aria-expanded="false" aria-controls="sgHearth"><button class="x" id="xHearth" aria-label="Clear hearthstone" hidden>×</button><ul class="sugg" id="sgHearth" role="listbox" hidden></ul></div>
@@ -265,6 +305,7 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
   </div>
   <div class="share" id="shareRow" hidden><button class="linkbtn" id="shareBtn" aria-live="polite"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8.5 11.5a3.5 3.5 0 005 0l3-3a3.5 3.5 0 00-5-5l-1 1"/><path d="M11.5 8.5a3.5 3.5 0 00-5 0l-3 3a3.5 3.5 0 005 5l1-1"/></svg><span>Copy link to this route</span></button></div>
   <div class="routes" id="routes"></div>
+  <button class="sheetmore" id="sheetMore"></button>
   <div class="foot"><span class="notes"><span>Times are estimates</span><span title="Fares are base prices; Honored or higher reputation takes 10% off in game">Prices before rep discounts</span></span><button class="linkbtn" id="aboutBtn">About &amp; travel notes</button></div>
   <p class="fan">Unofficial fan project. Not affiliated with or endorsed by Blizzard Entertainment.</p>
 </section>
