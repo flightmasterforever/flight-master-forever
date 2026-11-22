@@ -125,15 +125,8 @@ const KEEP_ON_MAP=true;
 // stays wholly in view but can sit anywhere, so a route can be framed above the bottom sheet
 const keepOn=(v,size,M)=>size>=M?Math.min(0,Math.max(M-size,v)):Math.max(0,Math.min(M-size,v));
 // on phones the bottom sheet covers the lower part of the map, so only the part above it has to stay on the parchment
-let shownFrac=()=>1,homeVB=null;
-// the view can go as far as the parchment's edges, or as far as the starting view goes where that's further (on phones
-// it shows some desk around the land): so at the starting zoom the map holds still, and once zoomed in it pans
-const within=(v,size,lo,hi)=>size>=hi-lo?(lo+hi-size)/2:Math.max(lo,Math.min(hi-size,v));
-const clampVB=()=>{if(!KEEP_ON_MAP)return;const f=shownFrac();
-  if(!homeVB){vb.x=keepOn(vb.x,vb.w,MW);vb.y=keepOn(vb.y,vb.h*f,MH);return}
-  if(vb.w>=homeVB.w*.999){vb={...homeVB};return}/* fully zoomed out: hold still */
-  const hf=homeVB.h*f;vb.x=within(vb.x,vb.w,Math.min(0,homeVB.x),Math.max(MW,homeVB.x+homeVB.w));
-  vb.y=within(vb.y,vb.h*f,Math.min(0,homeVB.y),Math.max(MH,homeVB.y+hf))};
+let shownFrac=()=>1;
+const clampVB=()=>{if(KEEP_ON_MAP){const f=shownFrac();vb.x=keepOn(vb.x,vb.w,MW);vb.y=keepOn(vb.y,vb.h*f,MH)}};
 const setVB=()=>{clampVB();svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`)};
 // while a finger or wheel is moving the map, the drawn map is just slid and scaled as a picture (cheap for the phone's
 // graphics chip); the real view is set and redrawn once the gesture ends
@@ -445,7 +438,7 @@ const homeView=()=>{const r=svg.getBoundingClientRect();const docked=document.bo
   // (on phones the whole land is shown even if that means some desk above and below the parchment)
   const fitS=Math.max(cw/freeW,chh/freeH),sc=narrow?fitS:Math.min(fitS,MW/r.width,MH/r.height);const fcx=narrow?r.width/2:card.right+8+pad+freeW/2,fcy=narrow?(r.height-sheetH())/2:r.height/2;
   const w=r.width*sc,h=r.height*sc;let x=(x0+x1)/2-fcx*sc,y=(y0+y1)/2-fcy*sc;
-  vb={x,y,w,h};homeVB=null;setVB();homeW=vb.w;homeVB={...vb}};
+  vb={x,y,w,h};setVB();homeW=vb.w};
 
 // ---- phone layout: the panel is a bottom sheet. Pulled down ("peek") it shows From/To and the chosen route; pulled up
 // ("full") it shows the steps, the other options and your character; pushed all the way down ("down") only the banner
@@ -482,7 +475,7 @@ function update(refit){
 // swaps it for the other faction's, unless you've already picked your own route
 const STARTER={A:[2,80],H:[23,18]};
 const isStarter=f=>from==STARTER[f][0]&&to==STARTER[f][1];
-const pickFac=f=>{if(f==fac)return;if(isStarter(fac)||(from==null&&to==null&&!phone.matches))[from,to]=STARTER[f];fac=f;save();update(false);homeView();draw()};/* switching faction shows the whole world */
+const pickFac=f=>{if(f==fac)return;if(isStarter(fac)||(from==null&&to==null&&!phone.matches))[from,to]=STARTER[f];fac=f;save();homeView();update(false)};/* switching faction shows the whole world */
 $("shareBtn").onclick=async()=>{const url=location.origin+location.pathname+"?"+linkFor(),lab=$("shareBtn").querySelector("span");
   let ok=false;try{await navigator.clipboard.writeText(url);ok=true}catch(e){try{const t=document.createElement("textarea");t.value=url;document.body.appendChild(t);t.select();ok=document.execCommand("copy");t.remove()}catch(e2){}}
   lab.textContent=ok?"Link copied":"Copy failed: "+url;setTimeout(()=>lab.textContent="Copy link to this route",2200)};
@@ -562,5 +555,5 @@ if(!fromLink&&!phone.matches)[from,to]=STARTER[fac];/* phones start empty */
   ["fromIn","toIn","hearthIn"].forEach(i=>$(i).addEventListener("focus",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")}));
   $("charTog").onclick=()=>{const bar=$("charTog").parentNode,open=!bar.classList.contains("open");bar.classList.toggle("open",open);$("charTog").setAttribute("aria-expanded",open)};
   phone.addEventListener("change",()=>{sheet("peek");homeView();draw()})}
-sheet("peek");update(false);homeView();draw();
+sheet("peek");homeView();update(false);
 }
