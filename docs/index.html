@@ -235,6 +235,7 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
   .card.peek{overflow:hidden;max-height:62%}
   .card.full{height:calc(100% - 64px)}
   .card.dragging{overflow:hidden}
+  .card.down{overflow:hidden}.card.down>:not(.head){display:none}.card.down .head{margin-bottom:0}
   .card .head{order:0;touch-action:none;cursor:grab;padding-top:16px}
   .grab{display:block;position:absolute;top:5px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:rgba(255,255,255,.55)}
   .fields{order:1}#routes{order:2}.sheetmore{order:3}.share{order:4}.charbar{order:5}.foot{order:6}.fan{order:7}
@@ -261,6 +262,8 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
   .linkbtn{padding:12px 0}
   .pop{right:68px!important}
 }
+/* while the map is being dragged or pinched it's moved as one picture, and the route's marching dashes pause */
+#map.moving{will-change:transform;transform-origin:0 0}#map.moving .rline{animation-play-state:paused}
 /* short screens (phones on their side): the legend would cover most of the map */
 @media (max-height:500px){.legend{display:none}}
 </style>
@@ -501,8 +504,21 @@ const KEEP_ON_MAP=true;
 const keepOn=(v,size,M)=>size>=M?Math.min(0,Math.max(M-size,v)):Math.max(0,Math.min(M-size,v));
 // on phones the bottom sheet covers the lower part of the map, so only the part above it has to stay on the parchment
 let shownFrac=()=>1;
-const setVB=()=>{if(KEEP_ON_MAP){const f=shownFrac();vb.x=keepOn(vb.x,vb.w,MW);vb.y=keepOn(vb.y,vb.h*f,MH)}
-  svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`)};
+const clampVB=()=>{if(KEEP_ON_MAP){const f=shownFrac();vb.x=keepOn(vb.x,vb.w,MW);vb.y=keepOn(vb.y,vb.h*f,MH)}};
+const setVB=()=>{clampVB();svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`)};
+// while a finger or wheel is moving the map, the drawn map is just slid and scaled as a picture (cheap for the phone's
+// graphics chip); the real view is set and redrawn once the gesture ends
+let live=null;
+const mapBox=()=>live?live.r:svg.getBoundingClientRect();
+const liveStart=()=>{if(!live){live={vb:{...vb},r:svg.getBoundingClientRect()};svg.classList.add("moving")}};
+const liveShow=()=>{clampVB();const r=live.r,o=live.vb;const at=v=>{const k=Math.max(v.w/r.width,v.h/r.height);return{k,x:v.x-(r.width*k-v.w)/2,y:v.y-(r.height*k-v.h)/2}};
+  const a=at(o),b=at(vb),S=a.k/b.k,tx=(a.x-b.x)/b.k,ty=(a.y-b.y)/b.k;
+  // the picture only holds what was on screen when the gesture began: once it's slid or scaled far enough to show
+  // a blank edge, set the real view (no full redraw) and carry on from there, at most a few times a second
+  const now=performance.now();if((Math.abs(tx)>r.width*.2||Math.abs(ty)>r.height*.2||S<.75)&&now-(live.t||0)>180){
+    live.t=now;live.vb={...vb};svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);svg.style.transform="";return}
+  svg.style.transform=`translate(${tx}px,${ty}px) scale(${S})`};
+const liveEnd=()=>{if(!live)return;live=null;svg.style.transform="";svg.classList.remove("moving");setVB();draw();placePop()};
 const pathD=p=>{let d="M"+p[0]+","+p[1];for(let k=2;k<p.length;k+=2)d+="L"+p[k]+","+p[k+1];return d};
 const sailPts=route=>{const out=[];for(const pc of (G.sails[route]||[]))for(const q of pc)out.push(q);return out};
 function curve(a,b){const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,d=Math.hypot(a.x-b.x,a.y-b.y);return `M${a.x},${a.y}Q${mx},${my-Math.min(300,d*.15)} ${b.x},${b.y}`}
@@ -694,7 +710,7 @@ function steps(r){return r.legs.map((l,i)=>({...l,via:l.via||[],rebook:l.kind=="
 
 // ---- card ----
 function renderRoutes(){const box=$("routes");
-  if(from==null||to==null){box.innerHTML=`<p class="empty">${from==null?"Choose where you're starting, or click a flight point on the map.":"Now choose a destination."}</p>`;return}
+  if(from==null||to==null){box.innerHTML=`<p class="empty">${from==null?"Choose where you're starting, or "+(phone.matches?"tap":"click")+" a flight point on the map.":"Now choose a destination."}</p>`;return}
   if(from==to){box.innerHTML=`<p class="empty">You're already there.</p>`;return}
   if(routes[0].none){box.innerHTML=`<p class="empty">No route found between these two.</p>`;return}
   const nm=id=>esc(N[id].name);
@@ -803,13 +819,14 @@ const homeView=()=>{const r=svg.getBoundingClientRect();const docked=document.bo
   vb={x,y,w,h};setVB();homeW=vb.w};
 
 // ---- phone layout: the panel is a bottom sheet. Pulled down ("peek") it shows From/To and the chosen route; pulled up
-// ("full") it shows the steps, the other options and your character. Drag the banner or tap it to switch.
+// ("full") it shows the steps, the other options and your character; pushed all the way down ("down") only the banner
+// shows. Drag the banner, or tap it (down -> peek -> full -> peek), to switch.
 const card=document.querySelector(".card"),phone=matchMedia("(max-width:700px)");
 let sheetMode="peek",peekH=0;
 const sheetH=()=>sheetMode=="full"?peekH:card.getBoundingClientRect().height;
 shownFrac=()=>phone.matches?Math.max(.3,1-sheetH()/(svg.getBoundingClientRect().height||innerHeight)):1;
 function measurePeek(){if(phone.matches&&sheetMode=="peek")peekH=card.getBoundingClientRect().height}
-function sheet(m){sheetMode=m;const on=phone.matches;card.classList.toggle("peek",on&&m=="peek");card.classList.toggle("full",on&&m=="full");
+function sheet(m){sheetMode=m;const on=phone.matches;card.classList.toggle("peek",on&&m=="peek");card.classList.toggle("full",on&&m=="full");card.classList.toggle("down",on&&m=="down");
   document.body.classList.toggle("sheetfull",on&&m=="full");card.style.height="";if(on&&m=="peek")card.scrollTop=0;measurePeek()}
 function syncSheet(){const ok=from!=null&&to!=null&&from!=to&&routes.length&&!routes[0].none,n=ok?routes.length-1:0;
   $("sheetMore").textContent=ok?(n?`Steps and ${n} more option${n>1?"s":""}`:"Steps and travel extras"):"Your character and travel extras";measurePeek()}
@@ -836,7 +853,7 @@ function update(refit){
 // swaps it for the other faction's, unless you've already picked your own route
 const STARTER={A:[2,80],H:[23,18]};
 const isStarter=f=>from==STARTER[f][0]&&to==STARTER[f][1];
-const pickFac=f=>{if(f==fac)return;if(isStarter(fac)||(from==null&&to==null))[from,to]=STARTER[f];fac=f;save();homeView();update(false)};/* switching faction shows the whole world */
+const pickFac=f=>{if(f==fac)return;if(isStarter(fac)||(from==null&&to==null&&!phone.matches))[from,to]=STARTER[f];fac=f;save();homeView();update(false)};/* switching faction shows the whole world */
 $("shareBtn").onclick=async()=>{const url=location.origin+location.pathname+"?"+linkFor(),lab=$("shareBtn").querySelector("span");
   let ok=false;try{await navigator.clipboard.writeText(url);ok=true}catch(e){try{const t=document.createElement("textarea");t.value=url;document.body.appendChild(t);t.select();ok=document.execCommand("copy");t.remove()}catch(e2){}}
   lab.textContent=ok?"Link copied":"Copy failed: "+url;setTimeout(()=>lab.textContent="Copy link to this route",2200)};
@@ -867,22 +884,24 @@ $("aboutBtn").onclick=()=>{$("about").hidden=false;$("aboutX").focus()};$("about
 $("about").onclick=e=>{if(e.target.id=="about")$("about").hidden=true};
 addEventListener("keydown",e=>{if(e.key=="Escape"){$("about").hidden=true;closePop()}});
 let drag=null,moved=false,pinch=null;const touches=new Map();
-const toSvg=(cx,cy)=>{const r=svg.getBoundingClientRect();const k=Math.max(vb.w/r.width,vb.h/r.height);const ox=(r.width*k-vb.w)/2,oy=(r.height*k-vb.h)/2;return[vb.x+(cx-r.left)*k-ox,vb.y+(cy-r.top)*k-oy,k]};
-const zoomAt=(f,cx,cy)=>{const [x,y]=toSvg(cx,cy);const nw=Math.min(homeW,Math.max(70,vb.w*f));const s=nw/vb.w;vb={x:x-(x-vb.x)*s,y:y-(y-vb.y)*s,w:nw,h:vb.h*s};setVB();draw()};
-svg.addEventListener("wheel",e=>{e.preventDefault();zoomAt(e.deltaY>0?1.15:1/1.15,e.clientX,e.clientY)},{passive:false});
+const toSvg=(cx,cy)=>{const r=mapBox();const k=Math.max(vb.w/r.width,vb.h/r.height);const ox=(r.width*k-vb.w)/2,oy=(r.height*k-vb.h)/2;return[vb.x+(cx-r.left)*k-ox,vb.y+(cy-r.top)*k-oy,k]};
+const zoomTo=(f,cx,cy)=>{const [x,y]=toSvg(cx,cy);const nw=Math.min(homeW,Math.max(70,vb.w*f));const s=nw/vb.w;vb={x:x-(x-vb.x)*s,y:y-(y-vb.y)*s,w:nw,h:vb.h*s}};
+const zoomAt=(f,cx,cy)=>{zoomTo(f,cx,cy);setVB();draw()};
+let wheelT=0;
+svg.addEventListener("wheel",e=>{e.preventDefault();liveStart();zoomTo(e.deltaY>0?1.15:1/1.15,e.clientX,e.clientY);liveShow();clearTimeout(wheelT);wheelT=setTimeout(liveEnd,180)},{passive:false});
 // two fingers pinch to zoom around the point between them (and pan as they move)
 const pinchAt=()=>{const [a,b]=[...touches.values()];return{d:Math.hypot(a.x-b.x,a.y-b.y)||1,x:(a.x+b.x)/2,y:(a.y+b.y)/2}};
 svg.addEventListener("pointerdown",e=>{touches.set(e.pointerId,{x:e.clientX,y:e.clientY});svg.setPointerCapture(e.pointerId);
-  if(touches.size==2){const m=pinchAt();const [x,y,k]=toSvg(m.x,m.y);pinch={d:m.d,x,y,k,vb:{...vb}};drag=null;moved=true;return}
+  if(touches.size==2){const m=pinchAt();const [x,y,k]=toSvg(m.x,m.y);pinch={d:m.d,x,y,k,vb:{...vb}};drag=null;moved=true;liveStart();return}
   if(touches.size>2)return;drag={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y};moved=false});
 svg.addEventListener("pointermove",e=>{if(touches.has(e.pointerId))touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pinch&&touches.size>=2){const m=pinchAt(),r=svg.getBoundingClientRect();const nw=Math.min(homeW,Math.max(70,pinch.vb.w*pinch.d/m.d)),s=nw/pinch.vb.w,k=pinch.k*s;
-    vb={x:pinch.x-(m.x-r.left)*k,y:pinch.y-(m.y-r.top)*k,w:nw,h:pinch.vb.h*s};setVB();placePop();return}
+  if(pinch&&touches.size>=2){const m=pinchAt(),r=mapBox();const nw=Math.min(homeW,Math.max(70,pinch.vb.w*pinch.d/m.d)),s=nw/pinch.vb.w,k=pinch.k*s;
+    vb={x:pinch.x-(m.x-r.left)*k,y:pinch.y-(m.y-r.top)*k,w:nw,h:pinch.vb.h*s};liveShow();return}
   if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4){moved=true;svg.classList.add("drag")}
-  if(moved){const [, ,k]=toSvg(0,0);vb.x=drag.vx-dx*k;vb.y=drag.vy-dy*k;setVB();placePop()}});
-const lift=e=>{touches.delete(e.pointerId);if(pinch){if(touches.size<2){pinch=null;drag=null;svg.classList.remove("drag");draw()}return true}return false};
-svg.addEventListener("pointercancel",e=>{lift(e);drag=null;svg.classList.remove("drag")});
-svg.addEventListener("pointerup",e=>{if(lift(e)||(moved&&!drag))return;svg.classList.remove("drag");const wasDrag=moved;drag=null;if(wasDrag){draw();return}
+  if(moved){liveStart();const [, ,k]=toSvg(0,0);vb.x=drag.vx-dx*k;vb.y=drag.vy-dy*k;liveShow()}});
+const lift=e=>{touches.delete(e.pointerId);if(pinch){if(touches.size<2){pinch=null;drag=null;svg.classList.remove("drag");liveEnd()}return true}return false};
+svg.addEventListener("pointercancel",e=>{lift(e);drag=null;svg.classList.remove("drag");liveEnd()});
+svg.addEventListener("pointerup",e=>{if(lift(e)||(moved&&!drag))return;svg.classList.remove("drag");const wasDrag=moved;drag=null;if(wasDrag){liveEnd();return}
   const t=document.elementFromPoint(e.clientX,e.clientY);const g=t&&t.closest(".n");
   if(g)openPop(+g.dataset.n);else closePop()});
 const center=()=>{const r=svg.getBoundingClientRect();return[r.left+r.width/2,r.top+r.height/2]};
@@ -892,21 +911,22 @@ const ro=new ResizeObserver(()=>draw());ro.observe(svg);
 const fromLink=(()=>{try{const q=new URLSearchParams(location.search);const f=q.get("f");if(f!="A"&&f!="H")return false;
   const find=v=>{if(!v)return null;const c=Object.values(N).filter(o=>slug(o.name).replace(/^-|-$/g,"")==v&&o.f.has(f));return c.length?c[0].id:null};
   const a=find(q.get("from")),b=find(q.get("to"));if(a==null&&b==null)return false;fac=f;from=a;to=b;return true}catch(e){return false}})();
-if(!fromLink)[from,to]=STARTER[fac];
+if(!fromLink&&!phone.matches)[from,to]=STARTER[fac];/* phones start empty */
 // panel layout: docked to the left edge (default) or floating over the map; remembered between visits
 {const dockBtn=$("dock");const setDock=on=>{document.body.classList.toggle("docked",on);const l=on?"Float the panel over the map":"Dock the panel to the left";dockBtn.setAttribute("aria-label",l);dockBtn.title=l;dockBtn.setAttribute("aria-pressed",on)};
   let docked=true;try{docked=localStorage.getItem("fmf-dock")!=="0"}catch(e){}setDock(docked);
   dockBtn.onclick=()=>{docked=!docked;setDock(docked);try{localStorage.setItem("fmf-dock",docked?"1":"0")}catch(e){}homeView();draw()}}
 {const head=card.querySelector(".head");let s0=null;
-  const fullH=()=>innerHeight-64;
+  const fullH=()=>innerHeight-64,headH=()=>head.offsetHeight;
   head.addEventListener("pointerdown",e=>{if(!phone.matches||e.button||e.target.closest("button"))return;
     s0={y:e.clientY,h:card.getBoundingClientRect().height,moved:false};head.setPointerCapture(e.pointerId)});
   head.addEventListener("pointermove",e=>{if(!s0)return;const dy=e.clientY-s0.y;if(!s0.moved&&Math.abs(dy)<6)return;
     if(!s0.moved){s0.moved=true;card.classList.remove("peek");card.classList.add("dragging")}
-    card.style.height=Math.max(peekH,Math.min(fullH(),s0.h-dy))+"px"});
+    card.style.height=Math.max(headH(),Math.min(fullH(),s0.h-dy))+"px"});
   const end=()=>{if(!s0)return;const st=s0;s0=null;card.classList.remove("dragging");
     if(!st.moved){sheet(sheetMode=="peek"?"full":"peek");return}
-    const h=card.getBoundingClientRect().height;sheet(h>(peekH+fullH())/2?"full":"peek")};
+    // settle on the nearest of the three heights
+    const h=card.getBoundingClientRect().height;sheet(h>(peekH+fullH())/2?"full":h<(headH()+peekH)/2?"down":"peek")};
   head.addEventListener("pointerup",end);head.addEventListener("pointercancel",end);
   $("sheetMore").onclick=()=>sheet("full");
   $("routes").addEventListener("click",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")});
