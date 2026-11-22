@@ -235,6 +235,7 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
   .card.peek{overflow:hidden;max-height:62%}
   .card.full{height:calc(100% - 64px)}
   .card.dragging{overflow:hidden}
+  .card.down{overflow:hidden}.card.down>:not(.head){display:none}.card.down .head{margin-bottom:0}
   .card .head{order:0;touch-action:none;cursor:grab;padding-top:16px}
   .grab{display:block;position:absolute;top:5px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:rgba(255,255,255,.55)}
   .fields{order:1}#routes{order:2}.sheetmore{order:3}.share{order:4}.charbar{order:5}.foot{order:6}.fan{order:7}
@@ -261,6 +262,8 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
   .linkbtn{padding:12px 0}
   .pop{right:68px!important}
 }
+/* while the map is being dragged or pinched it's moved as one picture, and the route's marching dashes pause */
+#map.moving{will-change:transform;transform-origin:0 0}#map.moving .rline{animation-play-state:paused}
 /* short screens (phones on their side): the legend would cover most of the map */
 @media (max-height:500px){.legend{display:none}}
 </style>
