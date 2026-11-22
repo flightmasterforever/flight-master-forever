@@ -671,8 +671,8 @@ function draw(){
 
 // ---- routing ----
 function graph(opt){const g={};const add=(a,b,c,kind,label,cost,extra)=>{if(opt.ban&&opt.ban.has(a+">"+b))return;(g[a]||(g[a]=[])).push({b,c:opt.cheap?(cost||0)*10000+c:c,kind,label,cost,...extra})};
-  // whole flights, booked the way the game books them (confirmed against routes recorded in game with the
-  // Flight Master Dump addon): a direct flight if one exists, otherwise the shortest chain by flight-path length.
+  // whole flights, booked the way the game books them (confirmed against routes recorded in game):
+  // a direct flight if one exists, otherwise the shortest chain by flight-path length.
   // Landing and booking again is a separate step, so the planner can still choose it when that's faster.
   for(const f of flights(opt.ex))add(f.a,f.b,f.t+8,"fly","",f.cost,{t:f.t+8,via:f.via})/* the 8 sec covers taking off, landing and booking */
   // a dock tied to one faction's flight master in a shared town (Booty Bay) is used from this faction's flight master there
