@@ -121,7 +121,12 @@ const svg=$("map");const home={x:0,y:0,w:MW,h:MH};let vb={...home};
 // the view stays on the parchment: dragging or zooming stops at its edges (if the view is ever wider or taller
 // than the sheet, it's centred on it instead). Set KEEP_ON_MAP to false to allow dragging off the edge again
 const KEEP_ON_MAP=true;
-const setVB=()=>{if(KEEP_ON_MAP){vb.x=vb.w>=MW?(MW-vb.w)/2:Math.max(0,Math.min(MW-vb.w,vb.x));vb.y=vb.h>=MH?(MH-vb.h)/2:Math.max(0,Math.min(MH-vb.h,vb.y))}
+// keep one axis on the parchment: inside it while zoomed in; while zoomed out past it (tall phone screens), the parchment
+// stays wholly in view but can sit anywhere, so a route can be framed above the bottom sheet
+const keepOn=(v,size,M)=>size>=M?Math.min(0,Math.max(M-size,v)):Math.max(0,Math.min(M-size,v));
+// on phones the bottom sheet covers the lower part of the map, so only the part above it has to stay on the parchment
+let shownFrac=()=>1;
+const setVB=()=>{if(KEEP_ON_MAP){const f=shownFrac();vb.x=keepOn(vb.x,vb.w,MW);vb.y=keepOn(vb.y,vb.h*f,MH)}
   svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`)};
 const pathD=p=>{let d="M"+p[0]+","+p[1];for(let k=2;k<p.length;k+=2)d+="L"+p[k]+","+p[k+1];return d};
 const sailPts=route=>{const out=[];for(const pc of (G.sails[route]||[]))for(const q of pc)out.push(q);return out};
@@ -338,7 +343,9 @@ function renderRoutes(){const box=$("routes");
     return `<div class="rcard" data-r="${i}" ${i==ri?'aria-current="true"':'role="button" tabindex="0"'}>${sum}${list}</div>`}).join("");
   box.querySelectorAll('.rcard[data-r]').forEach(el=>{const go=()=>{const i=+el.dataset.r;if(i!=ri){ri=i;renderRoutes();fitRoute();draw()}};el.onclick=go;el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();go()}}})}
 
-function charSummary(){}
+function charSummary(){const hs=ch.hearth[fac],p=[];if(hs!=null&&N[hs]&&N[hs].f.has(fac))p.push("Hearth: "+N[hs].name);
+  if(ch.mage)p.push("Mage "+ch.mage);if(ch.druid)p.push("Druid");if(ch.gadget)p.push("Gadgetzan");if(ch.ever)p.push("Everlook");if(ch.gnome&&fac=="H")p.push("Gnomeregan");
+  $("charSum").textContent=p.length?p.join(" · "):"Hearthstone, class teleports, engineering"}
 const hearthList=q=>{q=(q||"").trim().toLowerCase();const seen=new Set();
   return Object.values(N).filter(o=>(o.fp||o.town)&&o.f.has(fac)&&!o.druid&&o.id!=-110).sort((a,b)=>a.name.localeCompare(b.name))
    .filter(o=>!seen.has(o.name)&&seen.add(o.name)).filter(o=>!q||o.name.toLowerCase().includes(q)||o.zone.toLowerCase().includes(q))
@@ -378,7 +385,7 @@ function syncInputs(){const hs=ch.hearth[fac],hv=hs!=null&&N[hs]&&N[hs].f.has(fa
   [["fromIn","xFrom",from],["toIn","xTo",to],["hearthIn","xHearth",hv]].forEach(([i,x,v])=>{const inp=$(i);if(document.activeElement!=inp)inp.value=v!=null?N[v].name:""; // never overwrite what's being typed
 $(x).hidden=v==null;
     const fd=inp.parentNode;if(v!=null){fd.dataset.f=catOf(N[v]);fd.title=CATN[catOf(N[v])]}else{delete fd.dataset.f;fd.removeAttribute("title")}})}
-const setFrom=id=>{from=id;popId=null;update(true)},setTo=id=>{to=id;popId=null;update(true)};
+const setFrom=id=>{from=id;popId=null;sheet("peek");update(true)},setTo=id=>{to=id;popId=null;sheet("peek");update(true)};
 combo($("fromIn"),$("sgFrom"),$("xFrom"),setFrom,()=>from);combo($("toIn"),$("sgTo"),$("xTo"),setTo,()=>to);
 const setHearth=id=>{ch.hearth[fac]=id;save();update(true)};
 combo($("hearthIn"),$("sgHearth"),$("xHearth"),setHearth,()=>ch.hearth[fac],hearthList,true);
@@ -401,9 +408,9 @@ const fit=ids=>{const r=svg.getBoundingClientRect();const xs=ids.map(n=>N[n].x),
   const card=document.querySelector(".card").getBoundingClientRect();const narrow=innerWidth<=700;
   let x0=Math.min(...xs)-120,x1=Math.max(...xs)+120,y0=Math.min(...ys)-90,y1=Math.max(...ys)+90;let w=Math.max(x1-x0,500),h=Math.max(y1-y0,340);
   // leave room for the card
-  const freeW=narrow?r.width:r.width-card.right-16,freeH=narrow?r.height-card.height:r.height;
+  const freeW=narrow?r.width-56:r.width-card.right-16,freeH=narrow?r.height-sheetH():r.height;/* (phones: clear of the zoom buttons) */
   const asp=freeW/freeH||1.4;if(w/h<asp)w=h*asp;else h=w/asp;const sc=w/freeW;const W2=r.width*sc,H2=r.height*sc;
-  const cx=(x0+x1)/2,cy=(y0+y1)/2;const fcx=narrow?r.width/2:card.right+16+freeW/2,fcy=narrow?(r.height-card.height)/2:r.height/2;
+  const cx=(x0+x1)/2,cy=(y0+y1)/2;const fcx=narrow?freeW/2:card.right+16+freeW/2,fcy=narrow?(r.height-sheetH())/2:r.height/2;
   vb={x:cx-fcx*sc,y:cy-fcy*sc,w:W2,h:H2};setVB()};
 const fitRoute=()=>{const r=routes[ri];if(r&&r.nodes&&r.nodes.length)fit(r.nodes)};
 // the starting view fits the land and its flight points (not the whole parchment and its frame), and it's as far
@@ -412,13 +419,25 @@ let homeW=MW;
 const homeView=()=>{const r=svg.getBoundingClientRect();const docked=document.body.classList.contains("docked")&&innerWidth>700;const card=docked?{right:-8,height:0}:document.querySelector(".card").getBoundingClientRect();const narrow=innerWidth<=700;
   const pts=Object.values(N);let x0=Math.min(...pts.map(o=>o.x)),x1=Math.max(...pts.map(o=>o.x)),y0=Math.min(...pts.map(o=>o.y)),y1=Math.max(...pts.map(o=>o.y));
   const m=60;x0-=m;x1+=m;y0-=m;y1+=m;const cw=x1-x0,chh=y1-y0;
-  const pad=narrow?12:28;const freeW=(narrow?r.width:r.width-card.right-8)-pad*2,freeH=(narrow?r.height-card.height:r.height)-pad*2;
+  const pad=narrow?12:28;const freeW=(narrow?r.width:r.width-card.right-8)-pad*2,freeH=(narrow?r.height-sheetH():r.height)-pad*2;
   // fit the land, but never so far out that the desk shows past the parchment's edge: on squarer or smaller
   // screens that means trimming a little off the sides rather than showing the whole sheet
-  const sc=Math.min(Math.max(cw/freeW,chh/freeH),MW/r.width,MH/r.height);const fcx=narrow?r.width/2:card.right+8+pad+freeW/2,fcy=narrow?(r.height-card.height)/2:r.height/2;
+  // (on phones the whole land is shown even if that means some desk above and below the parchment)
+  const fitS=Math.max(cw/freeW,chh/freeH),sc=narrow?fitS:Math.min(fitS,MW/r.width,MH/r.height);const fcx=narrow?r.width/2:card.right+8+pad+freeW/2,fcy=narrow?(r.height-sheetH())/2:r.height/2;
   const w=r.width*sc,h=r.height*sc;let x=(x0+x1)/2-fcx*sc,y=(y0+y1)/2-fcy*sc;
-  x=Math.max(0,Math.min(MW-w,x));y=Math.max(0,Math.min(MH-h,y));
-  vb={x,y,w,h};homeW=vb.w;setVB()};
+  vb={x,y,w,h};setVB();homeW=vb.w};
+
+// ---- phone layout: the panel is a bottom sheet. Pulled down ("peek") it shows From/To and the chosen route; pulled up
+// ("full") it shows the steps, the other options and your character. Drag the banner or tap it to switch.
+const card=document.querySelector(".card"),phone=matchMedia("(max-width:700px)");
+let sheetMode="peek",peekH=0;
+const sheetH=()=>sheetMode=="full"?peekH:card.getBoundingClientRect().height;
+shownFrac=()=>phone.matches?Math.max(.3,1-sheetH()/(svg.getBoundingClientRect().height||innerHeight)):1;
+function measurePeek(){if(phone.matches&&sheetMode=="peek")peekH=card.getBoundingClientRect().height}
+function sheet(m){sheetMode=m;const on=phone.matches;card.classList.toggle("peek",on&&m=="peek");card.classList.toggle("full",on&&m=="full");
+  document.body.classList.toggle("sheetfull",on&&m=="full");card.style.height="";if(on&&m=="peek")card.scrollTop=0;measurePeek()}
+function syncSheet(){const ok=from!=null&&to!=null&&from!=to&&routes.length&&!routes[0].none,n=ok?routes.length-1:0;
+  $("sheetMore").textContent=ok?(n?`Steps and ${n} more option${n>1?"s":""}`:"Steps and travel extras"):"Your character and travel extras";measurePeek()}
 
 function renderStatic(){
   $("legend").innerHTML=`<span><i style="background:var(--${fac})"></i>${fac=="A"?"Alliance":"Horde"}</span><span><i class="fB"></i>Both factions</span><span><img class="lic" src="icons/dungeon.png" alt="">Dungeon</span><span><img class="lic" src="icons/raid.png" alt="">Raid</span><span><i style="background:none;border:2px solid var(--new)"></i>New in Forever</span><span><img class="lic" src="icons/boat-m.png" alt="">Boat</span><span><img class="lic" src="icons/zeppelin-m.png" alt="">Zeppelin</span>`;
@@ -433,6 +452,7 @@ function update(refit){
   if(from!=null&&!vis(from))from=null;if(to!=null&&!vis(to))to=null;
   syncInputs();solve();renderRoutes();syncChar();renderStatic();
   if(popId!=null&&!vis(popId))closePop();
+  syncSheet();
   if(refit)fitRoute();
   if(popId==null)$("pop").hidden=true;syncLink();draw()}
 
@@ -446,7 +466,7 @@ $("shareBtn").onclick=async()=>{const url=location.origin+location.pathname+"?"+
   let ok=false;try{await navigator.clipboard.writeText(url);ok=true}catch(e){try{const t=document.createElement("textarea");t.value=url;document.body.appendChild(t);t.select();ok=document.execCommand("copy");t.remove()}catch(e2){}}
   lab.textContent=ok?"Link copied":"Copy failed: "+url;setTimeout(()=>lab.textContent="Copy link to this route",2200)};
 $("fA").onclick=()=>pickFac("A");$("fH").onclick=()=>pickFac("H");
-const swapEnds=()=>{[from,to]=[to,from];update(true)};
+const swapEnds=()=>{[from,to]=[to,from];sheet("peek");update(true)};
 $("swap").onclick=swapEnds;
 // drag to reorder (Google Maps style): drag a row by its handle past the other row's midpoint to swap
 (()=>{const box=$("stops"),rows=[...box.querySelectorAll(".stop")];
@@ -471,14 +491,23 @@ $("druid").onchange=e=>{ch.druid=e.target.checked;save();update(true)};$("gnome"
 $("aboutBtn").onclick=()=>{$("about").hidden=false;$("aboutX").focus()};$("aboutX").onclick=()=>{$("about").hidden=true};
 $("about").onclick=e=>{if(e.target.id=="about")$("about").hidden=true};
 addEventListener("keydown",e=>{if(e.key=="Escape"){$("about").hidden=true;closePop()}});
-let drag=null,moved=false;
+let drag=null,moved=false,pinch=null;const touches=new Map();
 const toSvg=(cx,cy)=>{const r=svg.getBoundingClientRect();const k=Math.max(vb.w/r.width,vb.h/r.height);const ox=(r.width*k-vb.w)/2,oy=(r.height*k-vb.h)/2;return[vb.x+(cx-r.left)*k-ox,vb.y+(cy-r.top)*k-oy,k]};
 const zoomAt=(f,cx,cy)=>{const [x,y]=toSvg(cx,cy);const nw=Math.min(homeW,Math.max(70,vb.w*f));const s=nw/vb.w;vb={x:x-(x-vb.x)*s,y:y-(y-vb.y)*s,w:nw,h:vb.h*s};setVB();draw()};
 svg.addEventListener("wheel",e=>{e.preventDefault();zoomAt(e.deltaY>0?1.15:1/1.15,e.clientX,e.clientY)},{passive:false});
-svg.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y};moved=false;svg.setPointerCapture(e.pointerId)});
-svg.addEventListener("pointermove",e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4){moved=true;svg.classList.add("drag")}
+// two fingers pinch to zoom around the point between them (and pan as they move)
+const pinchAt=()=>{const [a,b]=[...touches.values()];return{d:Math.hypot(a.x-b.x,a.y-b.y)||1,x:(a.x+b.x)/2,y:(a.y+b.y)/2}};
+svg.addEventListener("pointerdown",e=>{touches.set(e.pointerId,{x:e.clientX,y:e.clientY});svg.setPointerCapture(e.pointerId);
+  if(touches.size==2){const m=pinchAt();const [x,y,k]=toSvg(m.x,m.y);pinch={d:m.d,x,y,k,vb:{...vb}};drag=null;moved=true;return}
+  if(touches.size>2)return;drag={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y};moved=false});
+svg.addEventListener("pointermove",e=>{if(touches.has(e.pointerId))touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pinch&&touches.size>=2){const m=pinchAt(),r=svg.getBoundingClientRect();const nw=Math.min(homeW,Math.max(70,pinch.vb.w*pinch.d/m.d)),s=nw/pinch.vb.w,k=pinch.k*s;
+    vb={x:pinch.x-(m.x-r.left)*k,y:pinch.y-(m.y-r.top)*k,w:nw,h:pinch.vb.h*s};setVB();placePop();return}
+  if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4){moved=true;svg.classList.add("drag")}
   if(moved){const [, ,k]=toSvg(0,0);vb.x=drag.vx-dx*k;vb.y=drag.vy-dy*k;setVB();placePop()}});
-svg.addEventListener("pointerup",e=>{svg.classList.remove("drag");const wasDrag=moved;drag=null;if(wasDrag){draw();return}
+const lift=e=>{touches.delete(e.pointerId);if(pinch){if(touches.size<2){pinch=null;drag=null;svg.classList.remove("drag");draw()}return true}return false};
+svg.addEventListener("pointercancel",e=>{lift(e);drag=null;svg.classList.remove("drag")});
+svg.addEventListener("pointerup",e=>{if(lift(e)||(moved&&!drag))return;svg.classList.remove("drag");const wasDrag=moved;drag=null;if(wasDrag){draw();return}
   const t=document.elementFromPoint(e.clientX,e.clientY);const g=t&&t.closest(".n");
   if(g)openPop(+g.dataset.n);else closePop()});
 const center=()=>{const r=svg.getBoundingClientRect();return[r.left+r.width/2,r.top+r.height/2]};
@@ -493,5 +522,21 @@ if(!fromLink)[from,to]=STARTER[fac];
 {const dockBtn=$("dock");const setDock=on=>{document.body.classList.toggle("docked",on);const l=on?"Float the panel over the map":"Dock the panel to the left";dockBtn.setAttribute("aria-label",l);dockBtn.title=l;dockBtn.setAttribute("aria-pressed",on)};
   let docked=true;try{docked=localStorage.getItem("fmf-dock")!=="0"}catch(e){}setDock(docked);
   dockBtn.onclick=()=>{docked=!docked;setDock(docked);try{localStorage.setItem("fmf-dock",docked?"1":"0")}catch(e){}homeView();draw()}}
-homeView();update(false);
+{const head=card.querySelector(".head");let s0=null;
+  const fullH=()=>innerHeight-64;
+  head.addEventListener("pointerdown",e=>{if(!phone.matches||e.button||e.target.closest("button"))return;
+    s0={y:e.clientY,h:card.getBoundingClientRect().height,moved:false};head.setPointerCapture(e.pointerId)});
+  head.addEventListener("pointermove",e=>{if(!s0)return;const dy=e.clientY-s0.y;if(!s0.moved&&Math.abs(dy)<6)return;
+    if(!s0.moved){s0.moved=true;card.classList.remove("peek");card.classList.add("dragging")}
+    card.style.height=Math.max(peekH,Math.min(fullH(),s0.h-dy))+"px"});
+  const end=()=>{if(!s0)return;const st=s0;s0=null;card.classList.remove("dragging");
+    if(!st.moved){sheet(sheetMode=="peek"?"full":"peek");return}
+    const h=card.getBoundingClientRect().height;sheet(h>(peekH+fullH())/2?"full":"peek")};
+  head.addEventListener("pointerup",end);head.addEventListener("pointercancel",end);
+  $("sheetMore").onclick=()=>sheet("full");
+  $("routes").addEventListener("click",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")});
+  ["fromIn","toIn","hearthIn"].forEach(i=>$(i).addEventListener("focus",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")}));
+  $("charTog").onclick=()=>{const bar=$("charTog").parentNode,open=!bar.classList.contains("open");bar.classList.toggle("open",open);$("charTog").setAttribute("aria-expanded",open)};
+  phone.addEventListener("change",()=>{sheet("peek");homeView();draw()})}
+sheet("peek");homeView();update(false);
 }
