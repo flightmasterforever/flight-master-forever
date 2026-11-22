@@ -1,0 +1,1 @@
+window.__fm={N,EDG,TR,G,DOCKS,graph,dijkstra,solve,steps,secs,vis,fly,tUse,YPU,flights,get routes(){return routes},get ch(){return ch},setCh:o=>{ch={...ch,...o}},set:(f,t)=>{from=f;to=t},update:()=>update(false),setFac:x=>{fac=x},LOOP};

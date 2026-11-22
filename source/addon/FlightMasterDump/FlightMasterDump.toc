@@ -1,0 +1,8 @@
+## Interface: 16001, 11507
+## Title: Flight Master Dump
+## Notes: Records the flight routes the game shows at each flight master, for Flight Master: Forever.
+## Author: Eric
+## Version: 1.0
+## SavedVariables: FlightMasterDumpDB
+
+FlightMasterDump.lua

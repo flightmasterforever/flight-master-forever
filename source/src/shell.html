@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Flight paths, boats, zeppelins and teleports for WoW: Forever on one map. Pick a start and destination and get the fastest route, with times and fares.">
+<link rel="canonical" href="https://flightmasterforever.com/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#16294a">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Flight Master: Forever">
+<meta property="og:title" content="Flight Master: Forever">
+<meta property="og:description" content="Plan the fastest trip across Azeroth in WoW: Forever: flight paths, boats, zeppelins and teleports on one map.">
+<meta property="og:url" content="https://flightmasterforever.com/">
+<meta property="og:image" content="https://flightmasterforever.com/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Flight Master: Forever route planner, showing a route from Stormwind to Ratchet on the world map">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Flight Master: Forever">
+<meta name="twitter:description" content="Plan the fastest trip across Azeroth in WoW: Forever: flight paths, boats, zeppelins and teleports on one map.">
+<meta name="twitter:image" content="https://flightmasterforever.com/og-image.jpg">
+<title>Flight Master: Forever</title>
+<style>
+/* VOICE: a quick travel planner you glance at between quests.
+   IDEA: the gryphon master's wall map, with a route card pinned to its corner.
+   PICTURE: the whole world map, edge to edge; the route drawn on it in gold.
+   COLOUR and TYPE: parchment map, slate card, gold route; the system UI font throughout (no web fonts).
+   LAYOUT: map fills the screen, one floating card top-left (a bottom sheet on phones). */
+:root{color-scheme:light dark;--panel:light-dark(rgba(255,252,246,.96),rgba(24,29,35,.95));--ink:light-dark(#1d232a,#eef1f3);--mute:light-dark(#5f6a73,#a4b1bb);--rule:light-dark(#e2ddd1,#34414d);--field:light-dark(#f3efe6,#222a33);--A:#2f6fd1;--H:#c8322b;--B:#efcf96;--Bline:#6e4c1a;--Bbar:#c99a4a;--Btint:light-dark(rgba(243,214,162,.55),rgba(243,214,162,.15));--Btint2:light-dark(rgba(243,214,162,.95),rgba(243,214,162,.28));--Dg:#2f8f3a;--R:#4a4a4a;
+  --bA:light-dark(rgba(112,184,232,.6),rgba(112,184,232,.24));--bH:light-dark(rgba(232,116,108,.5),rgba(232,116,108,.24));--bB:light-dark(rgba(243,214,162,.8),rgba(243,214,162,.2));
+  --bDr:light-dark(rgba(255,125,10,.38),rgba(255,125,10,.22));--bDg:light-dark(rgba(34,139,34,.3),rgba(70,170,70,.22));--bR:light-dark(rgba(55,55,55,.24),rgba(170,170,170,.16));
+  --hov:light-dark(rgba(0,0,0,.1),rgba(255,255,255,.1));--new:#e0a526;--route:#ffbf1f;--gold:light-dark(#9a6a00,#f0c14b)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%;overflow:hidden}
+body{--sys:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;font:15px/1.45 var(--sys);color:var(--ink);background:light-dark(radial-gradient(ellipse at 60% 45%,#e4dfd3,#c9c2b2),radial-gradient(ellipse at 60% 45%,#1d232a,#0e1216))}
+#map{position:fixed;inset:0;width:100%;height:100%;cursor:grab;user-select:none;touch-action:none;display:block}
+#map.drag{cursor:grabbing}
+svg text{font-family:var(--sys);paint-order:stroke;stroke:#1b1208;stroke-linejoin:round}
+.card{position:fixed;top:16px;left:16px;width:370px;max-height:calc(100% - 32px);overflow:auto;background:var(--panel);border:1px solid var(--rule);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);backdrop-filter:blur(6px);z-index:5}
+.head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 6px}
+h1{font-family:var(--sys);font-weight:800;letter-spacing:-.01em;font-size:18px;line-height:1.1;margin:0}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:999px;overflow:hidden;background:var(--field);flex:none}
+.seg button{border:0;background:none;color:var(--ink);font:inherit;font-weight:700;font-size:14px;padding:6px 12px;min-height:34px;cursor:pointer}
+.seg button[aria-pressed=true]{color:#fff}
+
+.fields{position:relative;padding:8px 10px 8px 2px;display:grid;grid-template-columns:minmax(0,1fr) 40px;gap:0 4px;align-items:center}
+.stops{grid-column:1;position:relative;display:flex;flex-direction:column;gap:10px}
+.gut{position:absolute;left:20px;top:0;width:24px;height:98px;pointer-events:none}
+.gut .o{position:absolute;left:5px;top:15px;width:14px;height:14px;border-radius:50%;border:2.5px solid var(--ink)}
+.gut .dots{position:absolute;left:10.5px;top:34px;height:24px;border-left:3px dotted var(--mute)}
+/* the dotted line ends in an arrowhead pointing at the destination */
+.gut .dots::after{content:"";position:absolute;left:-6.5px;bottom:-6px;border:5px solid transparent;border-top:6px solid var(--mute);border-bottom:0}
+.gut .p{position:absolute;left:4px;top:66px;width:16px;height:20px;color:#d9412b}
+.stop{position:relative;display:flex;align-items:center;transition:transform .18s ease}
+.stop.dragging{transition:none;z-index:3}.stops.snap .stop{transition:none}
+.stop.dragging input{box-shadow:0 8px 20px rgba(0,0,0,.28)}
+.grip{position:relative;width:20px;height:44px;flex:none;border:0;padding:0;background:none;color:var(--mute);cursor:grab;opacity:0;display:grid;place-items:center;touch-action:none;transition:opacity .12s}
+.grip svg{width:10px;height:16px}.grip:focus-visible{outline:2px solid var(--gold);outline-offset:-3px;border-radius:6px}
+.stop:hover .grip,.grip:focus-visible,.stop.dragging .grip{opacity:1}.stop.dragging .grip{cursor:grabbing}
+@media (hover:none){.grip{opacity:.6}}
+.grip::after{content:"Drag to reorder";position:absolute;left:-2px;top:calc(100% - 4px);background:#3c4043;color:#fff;font-size:13px;line-height:1;padding:7px 9px;border-radius:4px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s .35s;z-index:9}
+.grip:hover::after{opacity:1}.stop.dragging .grip::after,.stops.dragging .grip::after{opacity:0;transition:none}
+.slot{width:28px;flex:none}
+.field{position:relative;flex:1}
+.field input{width:100%;font:inherit;font-size:16px;padding:10px 34px 10px 12px;border-radius:8px;border:1px solid light-dark(#8f969c,#5a6772);background:light-dark(#fffdf8,#1b222a);color:var(--ink);min-height:44px;transition:box-shadow .15s}
+/* From / To labels inside the start and destination boxes; they belong to the position, so they stay put when the boxes swap */
+.stops .stop .field::before{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);pointer-events:none;z-index:1}
+.stops .stop:nth-child(2) .field::before{content:"From"}
+.stops .stop:nth-child(3) .field::before{content:"To"}
+.stops .stop .field input{padding-left:66px}
+.field input:focus{outline:none;border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+.field .x{position:absolute;right:4px;top:50%;margin-top:-16px;width:32px;height:32px;border:0;background:none;color:var(--mute);font-size:18px;cursor:pointer;border-radius:8px}
+#swap{grid-column:2;justify-self:center;width:40px;height:40px;border-radius:50%;border:0;background:none;color:var(--ink);cursor:pointer;display:grid;place-items:center}
+#swap:hover{background:var(--field);color:var(--ink)}#swap svg{width:22px;height:22px}
+.sugg{position:absolute;left:0;right:0;top:calc(100% + 4px);margin:0;padding:0 0 4px;list-style:none;background:var(--panel);border:1px solid var(--rule);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:9;max-height:340px;overflow:auto;overscroll-behavior:contain}
+.sugg li{padding:8px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:baseline;gap:10px;border-bottom:1px solid light-dark(rgba(68,81,109,.28),rgba(0,0,0,.35));font-size:15px;line-height:1.3}
+.sugg li .zn{color:light-dark(#3d4650,#b9c3cb)}
+.sugg li small{color:light-dark(#3d4650,#b9c3cb);white-space:nowrap;font-size:12.5px;font-variant-numeric:tabular-nums}
+.sugg li[data-c=A]{background:var(--bA)}.sugg li[data-c=H]{background:var(--bH)}.sugg li[data-c=B]{background:var(--bB)}
+.sugg li[data-c=Dr]{background:var(--bDr)}.sugg li[data-c=Dg]{background:var(--bDg)}.sugg li[data-c=R]{background:var(--bR)}
+.sugg li[data-c][aria-selected=true],.sugg li[data-c]:hover{background-image:linear-gradient(var(--hov),var(--hov))}
+.sugg li[data-c][aria-selected=true]{outline:2px solid var(--gold);outline-offset:-2px}
+.stop .sugg{left:-42px;right:-42px}
+.sugg li.gh{position:sticky;top:0;z-index:1;display:block;cursor:default;background:var(--panel);border-bottom:1px solid light-dark(rgba(68,81,109,.28),rgba(0,0,0,.35));font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink);padding:9px 12px 5px}
+.sugg li.gh:hover{background:var(--panel)}
+.sugg li.cur{font-weight:700;position:relative;padding-left:30px}.sugg li.cur small,.sugg li.cur .zn{font-weight:400}.sugg li.cur::before{content:"✓";position:absolute;left:11px;color:light-dark(#7a5300,var(--gold))}
+.sugg li.empty{display:block;color:var(--mute);cursor:default}.sugg li.empty:hover{background:none}
+.field[data-f] input{box-shadow:inset 4px 0 0 var(--fc)}.field[data-f] input:focus{box-shadow:inset 0 0 0 1px var(--gold)}
+.field[data-f=A]{--fc:var(--A)}.field[data-f=H]{--fc:var(--H)}.field[data-f=B]{--fc:var(--Bbar)}.field[data-f=Dr]{--fc:#e07a12}.field[data-f=Dg]{--fc:var(--Dg)}.field[data-f=R]{--fc:var(--R)}
+.flegend{display:flex;gap:12px;font-size:12.5px;color:var(--mute);margin:-2px 2px 2px}.flegend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-0.5px}
+.charbar{padding:4px 16px 12px}
+.charh{font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--mute);margin:4px 2px 6px;display:flex;justify-content:space-between}.charh span{font-weight:500}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--rule);background:none;color:var(--ink);font:inherit;font-size:14px;padding:6px 12px;border-radius:999px;cursor:pointer;min-height:34px}
+.chip b{font-weight:700}
+.charp[hidden],.sugg[hidden],.pop[hidden]{display:none}
+.charp{padding:10px 12px 12px;border-radius:12px;background:var(--field);display:grid;gap:8px}
+.sub{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:2px 0 -2px}
+.sub.sep{border-top:1px solid var(--rule);padding-top:10px;margin-top:4px}
+.hint{font-size:12.5px;line-height:1.35;color:var(--mute);margin-top:-4px}.hint[hidden]{display:none}
+.row.mage{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:15px}.row.mage .seg button{min-width:38px;padding:4px 9px}
+.charp .field input{background:var(--panel);font-size:15px;min-height:40px;padding:8px 34px 8px 12px}
+.charp .field .x{margin-top:-16px}
+.charp .opt .ot{display:flex;flex-direction:column;line-height:1.25;margin-right:auto}.charp .opt small{color:var(--mute);font-size:12.5px}
+.hordeOnly{display:grid;gap:8px}.hordeOnly[hidden]{display:none}
+.sub .tag{font-size:10.5px;letter-spacing:.04em;padding:1px 6px;border-radius:99px;background:var(--H);color:#fff;margin-left:4px;vertical-align:1px}
+.charp label.row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:15px}
+.charp select{font:inherit;font-size:15px;padding:6px 8px;border-radius:8px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);max-width:62%}
+.charp input[type=checkbox]{width:20px;height:20px;accent-color:var(--gold)}
+.charp .seg button{padding:4px 10px;min-height:30px}
+.charp .seg button[aria-pressed=true]{background:var(--gold);color:light-dark(#fff,#1b1208)}
+.routes{border-top:1px solid var(--rule);padding:8px 10px 6px}
+.empty{color:var(--mute);margin:6px 6px 8px;font-size:15px}
+.rcard{border-radius:12px;padding:10px 12px;margin:4px 0;cursor:pointer;border:1px solid transparent}
+.rcard[aria-current=true]{background:var(--field);border-color:var(--rule);cursor:default}
+.rsum{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.icons{display:flex;align-items:center;gap:4px;color:var(--mute)}
+.icons svg{width:18px;height:18px}
+.icons .sep{width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.6}
+.tot{font-weight:700;font-size:17px;white-space:nowrap;display:flex;align-items:baseline;gap:10px}.rsum.open{justify-content:flex-start;margin:0 0 2px 30px}.rsum.open+ol.steps{margin-top:0}.tot small{font-weight:500;color:var(--mute);font-size:14px}
+ol.steps{list-style:none;margin:10px 0 2px;padding:0}
+.rhead{display:grid;grid-template-columns:24px 1fr auto;gap:12px;align-items:start}
+.rmode{color:var(--mute);display:grid;place-items:center start;height:22px}.rmode svg{width:20px;height:20px}
+.rcard[aria-current=true] .rmode{color:var(--acc,var(--gold))}
+.rname{font-size:15.5px;line-height:1.35;font-weight:500}.rwhy{color:var(--mute);font-size:13.5px;margin-top:1px}
+.rnum{text-align:right;white-space:nowrap;line-height:1.35}.rnum b{display:block;font-size:16px;color:var(--gold)}.rnum small{color:var(--mute);font-size:13px}
+.rcard{padding:12px 12px}.rcard+.rcard{border-top:1px solid var(--rule);border-radius:0}.rcard[aria-current=true]{border-radius:12px}.rcard[aria-current=true]+.rcard{border-top-color:transparent}
+.rcard[aria-current=true] ol.steps{margin-top:12px;padding-top:10px;border-top:1px solid var(--tintB,var(--rule))}
+ol.steps li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;padding:6px 0;position:relative}
+ol.steps li svg{width:20px;height:20px;color:var(--gold);margin-top:1px}
+ol.steps li svg{position:relative;z-index:1}
+/* every line leaves a 4px gap above and below the icons it joins */
+ol.steps li:not(:last-child)::before{content:"";position:absolute;left:10px;top:31px;bottom:-3px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--gold);opacity:.85}
+ol.steps li:not(:last-child)::after{display:none}
+ol.steps .hops{list-style:none;margin:3px 0 3px;padding:0;position:relative}
+/* the line through a flight's stops belongs to the stop list itself: from the plane icon down to the last stop, however the step ends */
+ol.steps .hops::before{content:"";position:absolute;left:-21.5px;top:0;bottom:11px;width:3px;border-radius:2px;background:var(--gold);opacity:.85}
+ol.steps .hops li{position:relative;display:block;padding:1px 0;font-size:13.5px;color:var(--mute)}
+ol.steps .hops li::before{content:"";position:absolute;left:-25px;top:50%;bottom:auto;width:10px;height:10px;margin-top:-5px;margin-left:0;border-radius:50%;background:light-dark(#fff,#1b2128);border:2px solid var(--gold);box-sizing:border-box;opacity:1;z-index:1}
+ol.steps .hops li::after{display:none}
+ol.steps .rb{font-size:12.5px;margin-bottom:1px}
+ol.steps .dz{font-weight:400}
+ol.steps .t{color:var(--mute);font-size:14px}
+.foot .notes{display:flex;flex-direction:column}.foot .linkbtn{white-space:nowrap}
+.fan{margin:0;padding:0 16px 14px;font-size:11.5px;line-height:1.4;color:var(--mute);opacity:.85}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;line-height:1.35;padding:6px 16px 12px;font-size:13px;color:var(--mute)}
+.linkbtn{border:0;background:none;color:var(--mute);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;padding:4px 0}
+.ctl{position:fixed;right:16px;bottom:16px;display:grid;gap:6px;z-index:4}
+.ctl button{width:44px;height:44px;border-radius:12px;border:1px solid var(--rule);background:var(--panel);color:var(--ink);font-size:20px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.legend{position:fixed;right:72px;bottom:16px;background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:6px 10px;font-size:13px;display:flex;flex-wrap:wrap;gap:4px 12px;z-index:3;max-width:calc(100% - 480px)}
+.legend .lic{width:19px;height:19px;margin:-5px 3px -4px -2px;vertical-align:middle}
+.sugg .ric{width:20px;height:20px;margin:-4px 5px -5px -3px;vertical-align:middle}
+.pop .pic{width:22px;height:22px;vertical-align:middle;margin:-3px 4px 0 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.pop{position:fixed;z-index:6;width:260px;background:var(--panel);border:1px solid var(--rule);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:12px}
+.pop h3{margin:0;font-size:16px;font-family:var(--sys)}
+.pop .z{color:var(--mute);font-size:14px;margin:2px 0 8px}
+.pop .row{display:flex;gap:6px}
+.btn{flex:1;font:inherit;font-weight:700;font-size:14px;padding:8px 10px;min-height:38px;border-radius:9px;border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer}
+.btn.pri{background:var(--route);border-color:#b98500;color:#1b1208}
+.pop details{margin-top:8px;font-size:14px}.pop summary{cursor:pointer;color:var(--mute)}
+.pop table{width:100%;border-collapse:collapse;margin-top:4px}.pop td{padding:3px 2px;border-bottom:1px solid var(--rule)}.pop td.n{text-align:right;white-space:nowrap;color:var(--mute)}
+.hset{display:block;margin-top:8px;font-size:13.5px}
+.badge.fB{background:var(--B)!important;color:#2a1d08;box-shadow:inset 0 0 0 1px var(--Bline)}
+i.fB{background:var(--B)!important;box-shadow:inset 0 0 0 1.5px var(--Bline)}
+.money{white-space:nowrap;display:inline-flex;gap:.35em;align-items:center}.coin{display:inline-flex;align-items:center;gap:1px;font-variant-numeric:tabular-nums}.coin img{width:1em;height:1em;flex:none;position:relative;top:.08em}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:99px;color:#fff;margin-right:4px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal[hidden]{display:none}
+.sheet{background:var(--panel);color:var(--ink);border-radius:16px;max-width:760px;width:100%;max-height:calc(100% - 32px);overflow:auto;padding:20px 24px;border:1px solid var(--rule)}
+.sheet h2{font-family:var(--sys);font-weight:800;font-size:22px;margin:0 0 8px}.sheet h3{margin:18px 0 6px;font-size:17px}
+.sheet table{width:100%;border-collapse:collapse;font-size:15px}.sheet td,.sheet th{text-align:left;padding:6px;border-bottom:1px solid var(--rule);vertical-align:top}.sheet th{color:var(--mute);font-weight:500}
+.sheet li{margin:5px 0}.sheet a{color:inherit}
+:focus-visible{outline:3px solid var(--route);outline-offset:2px}
+@keyframes dash{to{stroke-dashoffset:-24}}.rline{animation:dash 1s linear infinite}
+@media(prefers-reduced-motion:reduce){.rline{animation:none}}
+@media(max-width:700px){
+  .card{top:auto;bottom:0;left:0;right:0;width:auto;max-height:58%;border-radius:16px 16px 0 0}
+  .ctl{top:12px;bottom:auto;right:12px}.legend{display:none}
+  .pop{left:12px!important;right:12px;width:auto;top:12px!important}
+}
+
+/* faction themes: Alliance = Stormwind blue and gold, Horde = Orgrimmar red and bronze */
+:root[data-fac=A]{--gold:light-dark(#8a6400,#f0c14b);--acc:light-dark(#2556a8,#7fa8ec);--banner:linear-gradient(135deg,#0f2550 0%,#1f4a93 55%,#2d63b8 100%);--trim:#d4af37;--tint:light-dark(rgba(37,86,168,.07),rgba(127,168,236,.10));--tintB:light-dark(rgba(37,86,168,.28),rgba(127,168,236,.35))}
+:root[data-fac=H]{--gold:light-dark(#a3271c,#ff7a62);--acc:light-dark(#a3271c,#ff7a62);--banner:linear-gradient(135deg,#2b0606 0%,#6e120d 55%,#9c1d14 100%);--trim:#c8843a;--tint:light-dark(rgba(163,39,28,.07),rgba(255,122,98,.10));--tintB:light-dark(rgba(163,39,28,.28),rgba(255,122,98,.35))}
+.card{border-top:0;overflow:auto}
+.head{background:var(--banner,#333);color:#fff;padding:12px 14px 10px;margin:0 0 6px;border-bottom:2px solid var(--trim,#999);position:sticky;top:0;z-index:4;border-radius:16px 16px 0 0;box-shadow:inset 0 -1px 0 rgba(0,0,0,.25)}
+.head h1{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);letter-spacing:.01em}
+.head{container-type:inline-size}
+/* the title shrinks to fit beside the crests (narrow panel, scrollbar showing), and wraps only as a last resort */
+.head h1{flex:1 1 auto;min-width:0;font-size:clamp(14px,calc((100cqi - 146px)/13.5),18px);text-wrap:balance;display:flex;align-items:center;gap:9px}
+/* the site logo (the favicon) beside the title, with a soft shadow so the parchment lifts off the banner */
+.head h1 .logo{flex:none;width:36px;height:36px;margin:-4px 0 -4px -3px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}
+.head h1 span{min-width:0}
+/* the logo follows the faction: blue pin and gold wing for the Alliance, red pin and iron wing for the Horde */
+:root:not([data-fac=H]) .head .logo.lh,:root[data-fac=H] .head .logo.la{display:none}
+.head .seg{background:rgba(0,0,0,.28);border-color:rgba(255,255,255,.25)}
+.head .seg button{color:rgba(255,255,255,.82)}
+.head .seg button[aria-pressed=true]{color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.rcard[aria-current=true]{background:var(--tint);border-color:var(--tintB);box-shadow:inset 3px 0 0 var(--acc)}
+.charp{background:linear-gradient(var(--tint),var(--tint)),var(--field)}
+.sub{color:var(--acc)}
+.charh{color:var(--acc)}
+
+.crests{display:flex;gap:4px;flex:none}
+.crests button{position:relative;width:42px;height:46px;padding:0;border:0;background:none;cursor:pointer;display:grid;place-items:center;transition:transform .15s}
+.crests img{width:38px;height:38px;display:block;pointer-events:none;transition:filter .15s,opacity .15s;filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000) drop-shadow(0 0 3px rgba(0,0,0,.8))}
+.crests button[aria-pressed=false] img{opacity:.7;filter:grayscale(.7) drop-shadow(0 0 1px #000) drop-shadow(0 0 2px rgba(0,0,0,.8))}
+.crests button[aria-pressed=false]:hover img{opacity:1;filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 3px rgba(0,0,0,.8))}
+.crests button[aria-pressed=true]{transform:scale(1.1)}
+.crests button[aria-pressed=true] img{filter:drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000) drop-shadow(0 0 6px rgba(255,225,150,.9))}
+.crests button[aria-pressed=true]::after{content:"";position:absolute;left:9px;right:9px;bottom:-5px;height:3px;border-radius:2px;background:#f2d27a;box-shadow:0 0 6px rgba(242,210,122,.8)}
+.crests button:focus-visible{outline:2px solid #fff;outline-offset:2px;border-radius:8px}
+.head{padding:8px 10px 8px 14px}
+
+/* docked layout: the panel fills the left edge, full height, and the map takes the rest */
+@media (min-width:701px){
+body.docked .card{top:0;left:0;bottom:0;height:100%;max-height:none;width:380px;border-radius:0;border-width:0 1px 0 0;box-shadow:4px 0 18px rgba(0,0,0,.25)}
+body.docked .card .head{border-radius:0}
+body.docked #map{left:380px;width:calc(100% - 380px)}}
+@media (max-width:700px){#dock{display:none}}
+#dock svg{width:18px;height:18px}
+.mitlic summary{cursor:pointer;color:var(--acc,var(--gold));margin-top:4px}.mitlic pre{white-space:pre-wrap;font-size:11.5px;line-height:1.45;background:var(--tint,rgba(0,0,0,.05));padding:10px 12px;border-radius:8px;margin:6px 0 0}
+.share{display:flex;justify-content:flex-end;padding:8px 16px 0}.share .linkbtn{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+</style>
+</head>
+<body class="docked">
+<svg id="map" role="img" aria-label="World map of flight points and routes"></svg>
+
+<section class="card" aria-label="Route planner">
+  <div class="head">
+    <h1><img class="logo la" src="logo-alliance.svg" alt="" width="36" height="36"><img class="logo lh" src="logo-horde.svg" alt="" width="36" height="36"><span>Flight Master: Forever</span></h1>
+    <div class="crests" role="group" aria-label="Faction"><button id="fA" aria-pressed="true" aria-label="Alliance" title="Alliance"><img src="icons/crest-alliance.png" alt=""></button><button id="fH" aria-pressed="false" aria-label="Horde" title="Horde"><img src="icons/crest-horde.png" alt=""></button></div>
+  </div>
+  <div class="fields">
+    <div class="stops" id="stops">
+      <div class="gut" aria-hidden="true"><span class="o"></span><span class="dots"></span><svg class="p" viewBox="0 0 14 18"><path fill="currentColor" d="M7 0a7 7 0 017 7c0 5-7 11-7 11S0 12 0 7a7 7 0 017-7zm0 4a3 3 0 100 6 3 3 0 000-6z"/></svg></div>
+      <div class="stop" data-slot="0"><button class="grip" aria-label="Reorder start and destination (drag, or use arrow keys)"><svg viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></svg></button><span class="slot"></span><div class="field from"><input id="fromIn" placeholder="Choose starting point" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="sgFrom"><button class="x" id="xFrom" aria-label="Clear start" hidden>×</button><ul class="sugg" id="sgFrom" role="listbox" hidden></ul></div></div>
+      <div class="stop" data-slot="1"><button class="grip" aria-label="Reorder start and destination (drag, or use arrow keys)"><svg viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></svg></button><span class="slot"></span><div class="field to"><input id="toIn" placeholder="Choose destination" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="sgTo"><button class="x" id="xTo" aria-label="Clear destination" hidden>×</button><ul class="sugg" id="sgTo" role="listbox" hidden></ul></div></div>
+    </div>
+    <button id="swap" aria-label="Swap start and destination" title="Swap start and destination"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v14M4 8l4-4 4 4M16 20V6M12 16l4 4 4-4"/></svg></button>
+  </div>
+  <div class="charbar">
+    <div class="charh">Your character <span>optional</span></div>
+    <div class="charp" id="charP">
+      <div class="sub">Hearthstone</div>
+      <div class="field hf"><input id="hearthIn" placeholder="Not set · search your inn" autocomplete="off" role="combobox" aria-label="Hearthstone location" aria-expanded="false" aria-controls="sgHearth"><button class="x" id="xHearth" aria-label="Clear hearthstone" hidden>×</button><ul class="sugg" id="sgHearth" role="listbox" hidden></ul></div>
+      <div class="flegend" id="hLegend"></div>
+      <div class="sub sep">Class teleports</div>
+      <div class="row mage">Mage <div class="seg" role="group" aria-label="Mage level"><button data-m="0" aria-pressed="true">None</button><button data-m="20" aria-pressed="false" title="Level 20+">20</button><button data-m="30" aria-pressed="false" title="Level 30+">30</button><button data-m="40" aria-pressed="false" title="Level 40+">40</button><button data-m="50" aria-pressed="false" title="Level 50+">50</button></div></div>
+      <div class="hint" id="mageHint" hidden></div>
+      <label class="row opt"><span class="ot"><span>Druid</span><small>Teleport: Moonglade</small></span> <input type="checkbox" id="druid"></label>
+      <div class="sub sep">Engineering</div>
+      <label class="row opt"><span class="ot"><span>Gadgetzan Teleporter</span><small>Ultrasafe Transporter</small></span> <input type="checkbox" id="gadget"></label>
+      <label class="row opt"><span class="ot"><span>Everlook Teleporter</span><small>Dimensional Ripper</small></span> <input type="checkbox" id="ever"></label>
+      <div class="hordeOnly" id="questTp">
+        <div class="sub sep">Quest unlocks <span class="tag">Horde</span></div>
+        <label class="row opt"><span class="ot"><span>Gnomeregan Teleporter</span><small>Booty Bay ↔ Gnomeregan</small></span> <input type="checkbox" id="gnome"></label>
+        <div class="hint">Needs the Goblin Transponder from Scooty's quest "Gnomer-gooooone!" in Booty Bay.</div>
+      </div>
+    </div>
+  </div>
+  <div class="share" id="shareRow" hidden><button class="linkbtn" id="shareBtn" aria-live="polite"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8.5 11.5a3.5 3.5 0 005 0l3-3a3.5 3.5 0 00-5-5l-1 1"/><path d="M11.5 8.5a3.5 3.5 0 00-5 0l-3 3a3.5 3.5 0 005 5l1-1"/></svg><span>Copy link to this route</span></button></div>
+  <div class="routes" id="routes"></div>
+  <div class="foot"><span class="notes"><span>Times are estimates</span><span title="Fares are base prices; Honored or higher reputation takes 10% off in game">Prices before rep discounts</span></span><button class="linkbtn" id="aboutBtn">About &amp; travel notes</button></div>
+  <p class="fan">Unofficial fan project. Not affiliated with or endorsed by Blizzard Entertainment.</p>
+</section>
+
+<div class="ctl"><button id="dock" aria-label="Float the panel over the map" title="Float the panel over the map"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M7.5 3.5v13"/></svg></button><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zre" aria-label="Show the whole world">⟲</button></div>
+<div class="legend" id="legend"></div>
+<div class="pop" id="pop" hidden></div>
+
+<div class="modal" id="about" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="aboutH">
+    <div style="display:flex;justify-content:space-between;align-items:center"><h2 id="aboutH">About &amp; travel notes</h2><button class="btn" id="aboutX" style="flex:none">Close</button></div>
+    <h3>Travel extras</h3>
+    <ul>
+      <li><b>Hearthstone:</b> set the town your hearth is bound to, and routes can start by hearthing there (10-second cast; the hour-long cooldown isn't tracked).</li>
+      <li><b>Mages:</b> Teleport: Stormwind and Ironforge (Alliance) or Orgrimmar and Undercity (Horde) from level 20; Teleport: Darnassus or Thunder Bluff from level 30. Darnassus connects to Rut'theran Village through the portal at the tree's base.</li>
+      <li><b>Druids:</b> Teleport: Moonglade (level 10) goes to Nighthaven. Horde druids also get a flight from Moonglade to Thunder Bluff, and Alliance druids one from Moonglade to Rut'theran Village.</li>
+      <li><b>Engineers:</b> the Ultrasafe Transporter goes to Gadgetzan (Gnomish Engineering, skill 260) and the Dimensional Ripper to Everlook (Goblin Engineering, skill 260). Both can misfire, and their cooldowns aren't tracked.</li>
+      <li>Spell levels and engineering requirements are from the WoW: Forever client data (build 1.60.1.71037).</li>
+    </ul>
+    <h3>Boats, zeppelins and the tram</h3>
+    <table class="stack"><thead><tr><th>Type</th><th>Route</th><th>Faction</th></tr></thead><tbody id="ttable"></tbody></table>
+    <h3>About the data</h3>
+    <ul>
+      <li>The map art, flight master positions, routes, fares and flight paths come from World of Warcraft®: Forever's game files (build 1.60.1.70959), via <a href="https://wago.tools">wago.tools</a>.</li>
+      <li>Flight times are estimates at about 30 yards a second along the real flight path, plus a few seconds to take off and land. Boats and zeppelins count as about 5 minutes including the wait at the dock, and the tram as about 5 minutes including the walk from each flight master. Routes are ranked by total time.</li>
+      <li>Flights are booked the way the game books them, checked against routes recorded in game: if there's a direct flight to your pick, you fly it; otherwise the game takes the shortest chain of flight paths, and the stops it flies through are listed under the flight. "New flight" means land and talk to the flight master again, when that's quicker.</li>
+      <li>Zephras Isle floats in Skywall, the elemental plane of air, so Blizzard gives it no spot on the world map. It's drawn at true scale in the open sky north of the Maelstrom, from its own explored map, with the skyships from the Valanaar Skydocks to Dalaran (Alterac Mountains) and Skywatcher Plateau (Mulgore).</li>
+      <li>Fares are the base prices from the game's flight tables. Reputation discounts aren't applied: at Honored or above with a flight master's faction you pay less in game (Honored takes 10% off, so 6s 30c becomes 5s 67c).</li>
+      <li>Boat and zeppelin routes, docks and sailing paths come from the game's tables as compiled by the <a href="https://github.com/openmap-world/openmap">OpenMap</a> addon (MIT licence), as do the dungeon and raid entrances; the explored Zul'Gurub corner of Stranglethorn Vale uses the Classic Era client's overlay, because Forever's files don't include one yet; the open-sea stretches are routed around the land. Routes to a dungeon or raid end with a ride from the nearest flight point to its entrance. The new Menethil boat runs one way: Menethil → Southshore → Auberdine → Menethil.</li>
+      <li>Inn towns without a flight master (Goldshire, Kharanos, Dolanaar, Razor Hill, Bloodhoof Village, Brill) are placed from their in-game map coordinates, and the ride from them to the nearest flight master is estimated.</li>
+      <li>Level ranges are Classic's, except the announced ones for the new zones (Riverglades 35–45, Shen'dralas 40–45, Mount Hyjal 60). Shen'dralas has no flight master yet; Powderfuse Port's are in the files but not active.</li>
+      <li>The detailed map is built from every zone's fully discovered in-game map.</li>
+    </ul>
+    <h3>Credits &amp; legal</h3>
+    <ul>
+      <li>Flight Master: Forever is an unofficial, non-commercial fan project. It is not affiliated with, endorsed by or sponsored by Blizzard Entertainment.</li>
+      <li>World of Warcraft, Warcraft and Blizzard Entertainment are trademarks or registered trademarks of Blizzard Entertainment, Inc., in the U.S. and/or other countries. Map art, icons and faction crests © Blizzard Entertainment, Inc.</li>
+      <li>Inspired by <a href="https://classictinker.com/flight-master/">Classic Tinker's Flight Master</a>, whose route planner and layout this follows.</li>
+      <li>Game data read from the WoW: Forever client files via <a href="https://wago.tools">wago.tools</a>.</li>
+      <li>Boat, zeppelin and skyship docks and sailing paths, and dungeon and raid entrance positions, come from <a href="https://github.com/openmap-world/openmap">OpenMap</a>, used under the MIT licence:
+        <details class="mitlic"><summary>OpenMap licence (MIT)</summary><pre>MIT License
+
+Copyright (c) 2026 OpenMap contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the &quot;Software&quot;), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</pre></details></li>
+    </ul>
+  </div>
+</div>
+
+<script>
+__GDATA__
+__APP__
+</script>
+</body>
+</html>
