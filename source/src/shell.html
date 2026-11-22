@@ -234,7 +234,12 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
   .card>*{flex:none}
   .card.peek{overflow:hidden;max-height:62%}
   .card.full{height:calc(100% - 64px)}
-  .card.dragging{overflow:hidden}
+  .card.dragging{overflow:hidden;will-change:transform}
+  /* phones: nothing on the map animates on its own (the route's marching dashes would repaint the whole map every
+     frame), the panel is opaque instead of blurring the map behind it, and the map keeps its own graphics layer */
+  .rline{animation:none}
+  .card{backdrop-filter:none;background:light-dark(#fffcf6,#181d23)}
+  #map{will-change:transform;transform-origin:0 0}
   .card.down{overflow:hidden}.card.down>:not(.head){display:none}.card.down .head{margin-bottom:0}
   .card .head{order:0;touch-action:none;cursor:grab;padding-top:16px}
   .grab{display:block;position:absolute;top:5px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:rgba(255,255,255,.55)}
