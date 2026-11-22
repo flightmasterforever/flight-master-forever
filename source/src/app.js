@@ -127,22 +127,28 @@ const keepOn=(v,size,M)=>size>=M?Math.min(0,Math.max(M-size,v)):Math.max(0,Math.
 // on phones the bottom sheet covers the lower part of the map, so only the part above it has to stay on the parchment
 let shownFrac=()=>1;
 const clampVB=()=>{if(KEEP_ON_MAP){const f=shownFrac();vb.x=keepOn(vb.x,vb.w,MW);vb.y=keepOn(vb.y,vb.h*f,MH)}};
-const setVB=()=>{clampVB();svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`)};
+// phones draw the map past the screen's edges (OX, OY pixels each side), so a one-finger drag slides over map that's
+// already drawn instead of waiting for a redraw. vb is always the part on screen; the svg's own viewBox is widened
+let OX=0,OY=0;
+const screenBox=()=>{const r=svg.getBoundingClientRect();return{left:r.left+OX,top:r.top+OY,width:r.width-2*OX,height:r.height-2*OY}};
+const fitBox=(v,r)=>{const k=Math.max(v.w/r.width,v.h/r.height);return{k,x:v.x-(r.width*k-v.w)/2,y:v.y-(r.height*k-v.h)/2}};
+const applyVB=r=>{const b=fitBox(vb,r);svg.setAttribute("viewBox",`${b.x-OX*b.k} ${b.y-OY*b.k} ${(r.width+2*OX)*b.k} ${(r.height+2*OY)*b.k}`)};
+const setVB=()=>{clampVB();applyVB(mapBox())};
 // while a finger or wheel is moving the map, the drawn map is just slid and scaled as a picture (cheap for the phone's
 // graphics chip); the real view is set and redrawn once the gesture ends
 let live=null;
-const mapBox=()=>live?live.r:svg.getBoundingClientRect();
+const mapBox=()=>live?live.r:screenBox();
 let redrawT=0;
-const liveStart=()=>{clearTimeout(redrawT);if(!live){live={vb:{...vb},r:svg.getBoundingClientRect()};svg.classList.add("moving")}};
+const liveStart=()=>{clearTimeout(redrawT);if(!live){live={vb:{...vb},r:screenBox()};svg.classList.add("moving")}};
 const liveShow=()=>{if(live&&!live.raf)live.raf=requestAnimationFrame(liveFrame)};/* at most once a frame (two fingers send two moves) */
-const liveFrame=()=>{if(!live)return;live.raf=0;clampVB();const r=live.r,o=live.vb;const at=v=>{const k=Math.max(v.w/r.width,v.h/r.height);return{k,x:v.x-(r.width*k-v.w)/2,y:v.y-(r.height*k-v.h)/2}};
-  const a=at(o),b=at(vb),S=a.k/b.k,tx=(a.x-b.x)/b.k,ty=(a.y-b.y)/b.k;
-  // the picture only holds what was on screen when the gesture began. Zooming in just enlarges it, so it's redrawn
-  // only when a blank edge would show (panning far, zooming out): then the real view is set (no full redraw) and
-  // the gesture carries on from there, at most a few times a second
-  const gap=Math.max(tx/r.width,ty/r.height,(r.width-tx-r.width*S)/r.width,(r.height-ty-r.height*S)/r.height);
-  const now=performance.now();if(gap>.12&&now-(live.t||0)>200){
-    live.t=now;live.vb={...vb};svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);svg.style.transform="";return}
+const liveFrame=()=>{if(!live)return;live.raf=0;clampVB();const r=live.r,a=fitBox(live.vb,r),b=fitBox(vb,r);
+  // the svg's corner sits OX, OY off screen; S and (tx,ty) move what was drawn to where the new view wants it
+  const S=a.k/b.k,tx=OX+(a.x-b.x)/b.k-OX*S,ty=OY+(a.y-b.y)/b.k-OY*S;
+  // what was drawn when the gesture began covers the screen plus the margins. Only once a blank edge would show
+  // (dragged past the margin, or zoomed out) is the real view set (no full redraw), at most a few times a second
+  const gap=Math.max((tx-OX)/r.width,(ty-OY)/r.height,(r.width+OX-tx-(r.width+2*OX)*S)/r.width,(r.height+OY-ty-(r.height+2*OY)*S)/r.height);
+  const now=performance.now();if(gap>.04&&now-(live.t||0)>200){
+    live.t=now;live.vb={...vb};applyVB(r);svg.style.transform="";return}
   svg.style.transform=`translate3d(${tx}px,${ty}px,0) scale3d(${S},${S},1)`};/* 3D: kept on the graphics chip as one picture */
 // the full redraw (labels, detailed tiles) waits a moment, so a quick run of drags and pinches doesn't stall between them
 // (the view itself is set at once, so the map is in the right place meanwhile)
@@ -167,7 +173,7 @@ function rideD(l){const a=N[l.a],b=N[l.b];const P=sailPts(l.route);if(P.length<2
   let ia=near(a),ib=near(b),seg;if(ia<=ib)seg=P.slice(ia,ib+1);else if(l.route==LOOP)seg=P.slice(ia).concat(P.slice(0,ib+1));else seg=P.slice(ib,ia+1).reverse();
   return "M"+[[a.x,a.y],...seg,[b.x,b.y]].map(q=>q[0]+","+q[1]).join("L")}
 const legD=l=>{const a=N[l.a],b=N[l.b];return l.kind=="ride"?(l.label=="Tram"?`M${a.x},${a.y}L${b.x},${b.y}`:rideD(l)):l.kind=="fly"?pathD(flightPts(l)):l.kind=="tele"?curve(a,b):`M${a.x},${a.y}L${b.x},${b.y}`};
-const inView=(x,y,w,h)=>!(x+w<vb.x||x>vb.x+vb.w||y+h<vb.y||y>vb.y+vb.h);
+const inView=(x,y,w,h)=>{const m=Math.max(vb.w/Math.max(1,svg.clientWidth-2*OX),vb.h/Math.max(1,svg.clientHeight-2*OY)),mx=OX*m,my=OY*m;return !(x+w<vb.x-mx||x>vb.x+vb.w+mx||y+h<vb.y-my||y>vb.y+vb.h+my)};
 
 // labels never overlap: route names first, then flight points, then dungeons and the isle, then zone names.
 // A flight point's name tries the right, left, below and above its dot before it's hidden (hover still shows it)
@@ -203,7 +209,7 @@ function declutter(k){
       t.style.display="none";const g=t.parentNode;if(g&&g.classList&&g.classList.contains("n")&&!g.querySelector("title")){const ti=document.createElementNS("http://www.w3.org/2000/svg","title");ti.textContent=t.textContent;g.appendChild(ti)}}}
 }
 function draw(){
-  const pw=svg.clientWidth||900,ph=svg.clientHeight||600;const k=Math.max(vb.w/pw,vb.h/ph);
+  const pw=(svg.clientWidth-2*OX)||900,ph=(svg.clientHeight-2*OY)||600;const k=Math.max(vb.w/pw,vb.h/ph);
   const route=routes[ri];const onRoute=new Set(route?route.nodes:[]);
   const hop=k<2.4?Math.min(1,(2.4-k)/0.7):0;
   const tone=`filter:saturate(${1-0.35*hop}) sepia(${0.3*hop}) brightness(${1-0.08*hop})`;
@@ -424,28 +430,32 @@ function placePop(){if(popId==null)return;const o=N[popId],p=$("pop");const m=sv
   let x=sp.x+14,y=sp.y+14;const w=p.offsetWidth||260,h=p.offsetHeight||140;if(x+w>innerWidth-8)x=sp.x-w-14;if(y+h>innerHeight-8)y=sp.y-h-14;p.style.left=Math.max(8,x)+"px";p.style.top=Math.max(8,y)+"px"}
 
 // ---- view ----
-const fit=ids=>{const r=svg.getBoundingClientRect();const xs=ids.map(n=>N[n].x),ys=ids.map(n=>N[n].y);
+const fit=ids=>{const r=screenBox();const xs=ids.map(n=>N[n].x),ys=ids.map(n=>N[n].y);
   const card=document.querySelector(".card").getBoundingClientRect();const narrow=innerWidth<=700;
   let x0=Math.min(...xs)-120,x1=Math.max(...xs)+120,y0=Math.min(...ys)-90,y1=Math.max(...ys)+90;let w=Math.max(x1-x0,500),h=Math.max(y1-y0,340);
   // leave room for the card
   const freeW=narrow?r.width-56:r.width-card.right-16,freeH=narrow?r.height-sheetH():r.height;/* (phones: clear of the zoom buttons) */
   const asp=freeW/freeH||1.4;if(w/h<asp)w=h*asp;else h=w/asp;const sc=w/freeW;const W2=r.width*sc,H2=r.height*sc;
   const cx=(x0+x1)/2,cy=(y0+y1)/2;const fcx=narrow?freeW/2:card.right+16+freeW/2,fcy=narrow?(r.height-sheetH())/2:r.height/2;
-  vb={x:cx-fcx*sc,y:cy-fcy*sc,w:W2,h:H2};setVB()};
+  vb={x:cx-fcx*sc,y:cy-fcy*sc,w:W2,h:H2};setVB();fitW=vb.w};/* a route can need more room than the starting view */
 const fitRoute=()=>{const r=routes[ri];if(r&&r.nodes&&r.nodes.length)fit(r.nodes)};
 // the starting view fits the land and its flight points (not the whole parchment and its frame), and it's as far
 // out as zooming goes
-let homeW=MW;
-const homeView=()=>{const r=svg.getBoundingClientRect();const docked=document.body.classList.contains("docked")&&innerWidth>700;const card=docked?{right:-8,height:0}:document.querySelector(".card").getBoundingClientRect();const narrow=innerWidth<=700;
-  const pts=Object.values(N);let x0=Math.min(...pts.map(o=>o.x)),x1=Math.max(...pts.map(o=>o.x)),y0=Math.min(...pts.map(o=>o.y)),y1=Math.max(...pts.map(o=>o.y));
+let homeW=MW,fitW=0;const maxW=()=>Math.max(homeW,fitW);
+const FILL=true;
+const homeView=()=>{const r=screenBox();const docked=document.body.classList.contains("docked")&&innerWidth>700;const card=docked?{right:-8,height:0}:document.querySelector(".card").getBoundingClientRect();const narrow=innerWidth<=700;
+  // phones open on your faction's home continent (Alliance: Eastern Kingdoms, Horde: Kalimdor), and the map always
+  // fills the screen; bigger screens show all the land
+  const half=o=>fac=="A"?o.x>MW/2:o.x<MW/2;
+  const pts=Object.values(N).filter(o=>!narrow||!FILL||half(o));let x0=Math.min(...pts.map(o=>o.x)),x1=Math.max(...pts.map(o=>o.x)),y0=Math.min(...pts.map(o=>o.y)),y1=Math.max(...pts.map(o=>o.y));
   const m=60;x0-=m;x1+=m;y0-=m;y1+=m;const cw=x1-x0,chh=y1-y0;
   const pad=narrow?12:28;const freeW=(narrow?r.width:r.width-card.right-8)-pad*2,freeH=(narrow?r.height-sheetH():r.height)-pad*2;
   // fit the land, but never so far out that the desk shows past the parchment's edge: on squarer or smaller
   // screens that means trimming a little off the sides rather than showing the whole sheet
   // (on phones the whole land is shown even if that means some desk above and below the parchment)
-  const fitS=Math.max(cw/freeW,chh/freeH),sc=narrow?fitS:Math.min(fitS,MW/r.width,MH/r.height);const fcx=narrow?r.width/2:card.right+8+pad+freeW/2,fcy=narrow?(r.height-sheetH())/2:r.height/2;
+  const fitS=Math.max(cw/freeW,chh/freeH),sc=narrow&&!FILL?fitS:Math.min(fitS,MW/r.width,MH/r.height);const fcx=narrow?r.width/2:card.right+8+pad+freeW/2,fcy=narrow?(r.height-sheetH())/2:r.height/2;
   const w=r.width*sc,h=r.height*sc;let x=(x0+x1)/2-fcx*sc,y=(y0+y1)/2-fcy*sc;
-  vb={x,y,w,h};setVB();homeW=vb.w};
+  vb={x,y,w,h};setVB();homeW=vb.w;fitW=0};
 
 // ---- phone layout: the panel is a bottom sheet. Pulled down ("peek") it shows From/To and the chosen route; pulled up
 // ("full") it shows the steps, the other options and your character; pushed all the way down ("down") only the banner
@@ -514,7 +524,7 @@ $("about").onclick=e=>{if(e.target.id=="about")$("about").hidden=true};
 addEventListener("keydown",e=>{if(e.key=="Escape"){$("about").hidden=true;closePop()}});
 let drag=null,moved=false,pinch=null;const touches=new Map();
 const toSvg=(cx,cy)=>{const r=mapBox();const k=Math.max(vb.w/r.width,vb.h/r.height);const ox=(r.width*k-vb.w)/2,oy=(r.height*k-vb.h)/2;return[vb.x+(cx-r.left)*k-ox,vb.y+(cy-r.top)*k-oy,k]};
-const zoomTo=(f,cx,cy)=>{const [x,y]=toSvg(cx,cy);const nw=Math.min(homeW,Math.max(70,vb.w*f));const s=nw/vb.w;vb={x:x-(x-vb.x)*s,y:y-(y-vb.y)*s,w:nw,h:vb.h*s}};
+const zoomTo=(f,cx,cy)=>{const [x,y]=toSvg(cx,cy);const nw=Math.min(maxW(),Math.max(70,vb.w*f));const s=nw/vb.w;vb={x:x-(x-vb.x)*s,y:y-(y-vb.y)*s,w:nw,h:vb.h*s}};
 const zoomAt=(f,cx,cy)=>{zoomTo(f,cx,cy);setVB();draw()};
 let wheelT=0;
 svg.addEventListener("wheel",e=>{e.preventDefault();liveStart();zoomTo(e.deltaY>0?1.15:1/1.15,e.clientX,e.clientY);liveShow();clearTimeout(wheelT);wheelT=setTimeout(liveEnd,180)},{passive:false});
@@ -524,7 +534,7 @@ svg.addEventListener("pointerdown",e=>{touches.set(e.pointerId,{x:e.clientX,y:e.
   if(touches.size==2){const m=pinchAt();const [x,y,k]=toSvg(m.x,m.y);pinch={d:m.d,x,y,k,vb:{...vb}};drag=null;moved=true;liveStart();return}
   if(touches.size>2)return;drag={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y};moved=false});
 svg.addEventListener("pointermove",e=>{if(touches.has(e.pointerId))touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pinch&&touches.size>=2){const m=pinchAt(),r=mapBox();const nw=Math.min(homeW,Math.max(70,pinch.vb.w*pinch.d/m.d)),s=nw/pinch.vb.w,k=pinch.k*s;
+  if(pinch&&touches.size>=2){const m=pinchAt(),r=mapBox();const nw=Math.min(maxW(),Math.max(70,pinch.vb.w*pinch.d/m.d)),s=nw/pinch.vb.w,k=pinch.k*s;
     vb={x:pinch.x-(m.x-r.left)*k,y:pinch.y-(m.y-r.top)*k,w:nw,h:pinch.vb.h*s};liveShow();return}
   if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4){moved=true;svg.classList.add("drag")}
   if(moved){liveStart();const [, ,k]=toSvg(0,0);vb.x=drag.vx-dx*k;vb.y=drag.vy-dy*k;liveShow()}});
@@ -533,7 +543,7 @@ svg.addEventListener("pointercancel",e=>{lift(e);drag=null;svg.classList.remove(
 svg.addEventListener("pointerup",e=>{if(lift(e)||(moved&&!drag))return;svg.classList.remove("drag");const wasDrag=moved;drag=null;if(wasDrag){liveEnd();return}
   const t=document.elementFromPoint(e.clientX,e.clientY);const g=t&&t.closest(".n");
   if(g)openPop(+g.dataset.n);else closePop()});
-const center=()=>{const r=svg.getBoundingClientRect();return[r.left+r.width/2,r.top+r.height/2]};
+const center=()=>{const r=screenBox();return[r.left+r.width/2,r.top+r.height/2]};
 $("zin").onclick=()=>zoomAt(1/1.4,...center());$("zout").onclick=()=>zoomAt(1.4,...center());$("zre").onclick=()=>{homeView();draw()};
 const ro=new ResizeObserver(()=>draw());ro.observe(svg);
 // shareable links: ?f=A&from=stormwind&to=ratchet opens that route. Names are matched within the faction
@@ -568,6 +578,10 @@ if(!fromLink&&!phone.matches)[from,to]=STARTER[fac];/* phones start empty */
   $("routes").addEventListener("click",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")});
   ["fromIn","toIn","hearthIn"].forEach(i=>$(i).addEventListener("focus",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")}));
   $("charTog").onclick=()=>{const bar=$("charTog").parentNode,open=!bar.classList.contains("open");bar.classList.toggle("open",open);$("charTog").setAttribute("aria-expanded",open)};
-  phone.addEventListener("change",()=>{sheet("peek");homeView();draw()})}
+  phone.addEventListener("change",()=>{margins();sheet("peek");homeView();draw()})}
+// the margins: on phones only (large enough for most drags, small enough for the phone's graphics memory)
+const margins=()=>{const on=phone.matches;OX=on?Math.round(innerWidth*.4):0;OY=on?Math.round(innerHeight*.3):0;
+  Object.assign(svg.style,on?{left:-OX+"px",top:-OY+"px",width:`calc(100% + ${2*OX}px)`,height:`calc(100% + ${2*OY}px)`}:{left:"",top:"",width:"",height:""})};
+margins();addEventListener("resize",()=>{const o=[OX,OY];margins();if(o[0]!=OX||o[1]!=OY){setVB();draw()}});
 sheet("peek");homeView();update(false);
 }
