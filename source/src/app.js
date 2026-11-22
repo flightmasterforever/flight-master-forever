@@ -134,16 +134,20 @@ let live=null;
 const mapBox=()=>live?live.r:svg.getBoundingClientRect();
 let redrawT=0;
 const liveStart=()=>{clearTimeout(redrawT);if(!live){live={vb:{...vb},r:svg.getBoundingClientRect()};svg.classList.add("moving")}};
-const liveShow=()=>{clampVB();const r=live.r,o=live.vb;const at=v=>{const k=Math.max(v.w/r.width,v.h/r.height);return{k,x:v.x-(r.width*k-v.w)/2,y:v.y-(r.height*k-v.h)/2}};
+const liveShow=()=>{if(live&&!live.raf)live.raf=requestAnimationFrame(liveFrame)};/* at most once a frame (two fingers send two moves) */
+const liveFrame=()=>{if(!live)return;live.raf=0;clampVB();const r=live.r,o=live.vb;const at=v=>{const k=Math.max(v.w/r.width,v.h/r.height);return{k,x:v.x-(r.width*k-v.w)/2,y:v.y-(r.height*k-v.h)/2}};
   const a=at(o),b=at(vb),S=a.k/b.k,tx=(a.x-b.x)/b.k,ty=(a.y-b.y)/b.k;
-  // the picture only holds what was on screen when the gesture began: once it's slid or scaled far enough to show
-  // a blank edge, set the real view (no full redraw) and carry on from there, at most a few times a second
-  const now=performance.now();if((Math.abs(tx)>r.width*.2||Math.abs(ty)>r.height*.2||S<.75)&&now-(live.t||0)>180){
+  // the picture only holds what was on screen when the gesture began. Zooming in just enlarges it, so it's redrawn
+  // only when a blank edge would show (panning far, zooming out): then the real view is set (no full redraw) and
+  // the gesture carries on from there, at most a few times a second
+  const gap=Math.max(tx/r.width,ty/r.height,(r.width-tx-r.width*S)/r.width,(r.height-ty-r.height*S)/r.height);
+  const now=performance.now();if(gap>.12&&now-(live.t||0)>200){
     live.t=now;live.vb={...vb};svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);svg.style.transform="";return}
-  svg.style.transform=`translate(${tx}px,${ty}px) scale(${S})`};
+  svg.style.transform=`translate3d(${tx}px,${ty}px,0) scale3d(${S},${S},1)`};/* 3D: kept on the graphics chip as one picture */
 // the full redraw (labels, detailed tiles) waits a moment, so a quick run of drags and pinches doesn't stall between them
-const liveEnd=()=>{if(!live)return;live=null;svg.style.transform="";svg.classList.remove("moving");setVB();placePop();
-  clearTimeout(redrawT);redrawT=setTimeout(()=>{draw();placePop()},140)};
+// (the view itself is set at once, so the map is in the right place meanwhile)
+const liveEnd=()=>{if(!live)return;cancelAnimationFrame(live.raf);live=null;svg.style.transform="";svg.classList.remove("moving");setVB();placePop();
+  clearTimeout(redrawT);redrawT=setTimeout(()=>{draw();placePop()},phone.matches?350:140)};/* phones: pinches come in quick runs */
 const pathD=p=>{let d="M"+p[0]+","+p[1];for(let k=2;k<p.length;k+=2)d+="L"+p[k]+","+p[k+1];return d};
 const sailPts=route=>{const out=[];for(const pc of (G.sails[route]||[]))for(const q of pc)out.push(q);return out};
 function curve(a,b){const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,d=Math.hypot(a.x-b.x,a.y-b.y);return `M${a.x},${a.y}Q${mx},${my-Math.min(300,d*.15)} ${b.x},${b.y}`}
