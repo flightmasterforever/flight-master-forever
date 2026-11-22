@@ -820,21 +820,25 @@ const fit=ids=>{const r=screenBox();const xs=ids.map(n=>N[n].x),ys=ids.map(n=>N[
   const freeW=narrow?r.width-56:r.width-card.right-16,freeH=narrow?r.height-sheetH():r.height;/* (phones: clear of the zoom buttons) */
   const asp=freeW/freeH||1.4;if(w/h<asp)w=h*asp;else h=w/asp;const sc=w/freeW;const W2=r.width*sc,H2=r.height*sc;
   const cx=(x0+x1)/2,cy=(y0+y1)/2;const fcx=narrow?freeW/2:card.right+16+freeW/2,fcy=narrow?(r.height-sheetH())/2:r.height/2;
-  vb={x:cx-fcx*sc,y:cy-fcy*sc,w:W2,h:H2};setVB()};
+  vb={x:cx-fcx*sc,y:cy-fcy*sc,w:W2,h:H2};setVB();fitW=vb.w};/* a route can need more room than the starting view */
 const fitRoute=()=>{const r=routes[ri];if(r&&r.nodes&&r.nodes.length)fit(r.nodes)};
 // the starting view fits the land and its flight points (not the whole parchment and its frame), and it's as far
 // out as zooming goes
-let homeW=MW;
+let homeW=MW,fitW=0;const maxW=()=>Math.max(homeW,fitW);
+const FILL=true;
 const homeView=()=>{const r=screenBox();const docked=document.body.classList.contains("docked")&&innerWidth>700;const card=docked?{right:-8,height:0}:document.querySelector(".card").getBoundingClientRect();const narrow=innerWidth<=700;
-  const pts=Object.values(N);let x0=Math.min(...pts.map(o=>o.x)),x1=Math.max(...pts.map(o=>o.x)),y0=Math.min(...pts.map(o=>o.y)),y1=Math.max(...pts.map(o=>o.y));
+  // phones open on your faction's home continent (Alliance: Eastern Kingdoms, Horde: Kalimdor), and the map always
+  // fills the screen; bigger screens show all the land
+  const half=o=>fac=="A"?o.x>MW/2:o.x<MW/2;
+  const pts=Object.values(N).filter(o=>!narrow||!FILL||half(o));let x0=Math.min(...pts.map(o=>o.x)),x1=Math.max(...pts.map(o=>o.x)),y0=Math.min(...pts.map(o=>o.y)),y1=Math.max(...pts.map(o=>o.y));
   const m=60;x0-=m;x1+=m;y0-=m;y1+=m;const cw=x1-x0,chh=y1-y0;
   const pad=narrow?12:28;const freeW=(narrow?r.width:r.width-card.right-8)-pad*2,freeH=(narrow?r.height-sheetH():r.height)-pad*2;
   // fit the land, but never so far out that the desk shows past the parchment's edge: on squarer or smaller
   // screens that means trimming a little off the sides rather than showing the whole sheet
   // (on phones the whole land is shown even if that means some desk above and below the parchment)
-  const fitS=Math.max(cw/freeW,chh/freeH),sc=narrow?fitS:Math.min(fitS,MW/r.width,MH/r.height);const fcx=narrow?r.width/2:card.right+8+pad+freeW/2,fcy=narrow?(r.height-sheetH())/2:r.height/2;
+  const fitS=Math.max(cw/freeW,chh/freeH),sc=narrow&&!FILL?fitS:Math.min(fitS,MW/r.width,MH/r.height);const fcx=narrow?r.width/2:card.right+8+pad+freeW/2,fcy=narrow?(r.height-sheetH())/2:r.height/2;
   const w=r.width*sc,h=r.height*sc;let x=(x0+x1)/2-fcx*sc,y=(y0+y1)/2-fcy*sc;
-  vb={x,y,w,h};setVB();homeW=vb.w};
+  vb={x,y,w,h};setVB();homeW=vb.w;fitW=0};
 
 // ---- phone layout: the panel is a bottom sheet. Pulled down ("peek") it shows From/To and the chosen route; pulled up
 // ("full") it shows the steps, the other options and your character; pushed all the way down ("down") only the banner
@@ -903,7 +907,7 @@ $("about").onclick=e=>{if(e.target.id=="about")$("about").hidden=true};
 addEventListener("keydown",e=>{if(e.key=="Escape"){$("about").hidden=true;closePop()}});
 let drag=null,moved=false,pinch=null;const touches=new Map();
 const toSvg=(cx,cy)=>{const r=mapBox();const k=Math.max(vb.w/r.width,vb.h/r.height);const ox=(r.width*k-vb.w)/2,oy=(r.height*k-vb.h)/2;return[vb.x+(cx-r.left)*k-ox,vb.y+(cy-r.top)*k-oy,k]};
-const zoomTo=(f,cx,cy)=>{const [x,y]=toSvg(cx,cy);const nw=Math.min(homeW,Math.max(70,vb.w*f));const s=nw/vb.w;vb={x:x-(x-vb.x)*s,y:y-(y-vb.y)*s,w:nw,h:vb.h*s}};
+const zoomTo=(f,cx,cy)=>{const [x,y]=toSvg(cx,cy);const nw=Math.min(maxW(),Math.max(70,vb.w*f));const s=nw/vb.w;vb={x:x-(x-vb.x)*s,y:y-(y-vb.y)*s,w:nw,h:vb.h*s}};
 const zoomAt=(f,cx,cy)=>{zoomTo(f,cx,cy);setVB();draw()};
 let wheelT=0;
 svg.addEventListener("wheel",e=>{e.preventDefault();liveStart();zoomTo(e.deltaY>0?1.15:1/1.15,e.clientX,e.clientY);liveShow();clearTimeout(wheelT);wheelT=setTimeout(liveEnd,180)},{passive:false});
@@ -913,7 +917,7 @@ svg.addEventListener("pointerdown",e=>{touches.set(e.pointerId,{x:e.clientX,y:e.
   if(touches.size==2){const m=pinchAt();const [x,y,k]=toSvg(m.x,m.y);pinch={d:m.d,x,y,k,vb:{...vb}};drag=null;moved=true;liveStart();return}
   if(touches.size>2)return;drag={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y};moved=false});
 svg.addEventListener("pointermove",e=>{if(touches.has(e.pointerId))touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pinch&&touches.size>=2){const m=pinchAt(),r=mapBox();const nw=Math.min(homeW,Math.max(70,pinch.vb.w*pinch.d/m.d)),s=nw/pinch.vb.w,k=pinch.k*s;
+  if(pinch&&touches.size>=2){const m=pinchAt(),r=mapBox();const nw=Math.min(maxW(),Math.max(70,pinch.vb.w*pinch.d/m.d)),s=nw/pinch.vb.w,k=pinch.k*s;
     vb={x:pinch.x-(m.x-r.left)*k,y:pinch.y-(m.y-r.top)*k,w:nw,h:pinch.vb.h*s};liveShow();return}
   if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4){moved=true;svg.classList.add("drag")}
   if(moved){liveStart();const [, ,k]=toSvg(0,0);vb.x=drag.vx-dx*k;vb.y=drag.vy-dy*k;liveShow()}});
