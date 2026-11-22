@@ -208,29 +208,25 @@ function declutter(k){
     if(!ok){if(spots[0]){t.setAttribute("x",spots[0][0]);t.setAttribute("y",spots[0][1]);t.setAttribute("text-anchor",spots[0][2])}
       t.style.display="none";const g=t.parentNode;if(g&&g.classList&&g.classList.contains("n")&&!g.querySelector("title")){const ti=document.createElementNS("http://www.w3.org/2000/svg","title");ti.textContent=t.textContent;g.appendChild(ti)}}}
 }
+const BT=512;/* baked tile size, in map units */
 function draw(){
   const pw=(svg.clientWidth-2*OX)||900,ph=(svg.clientHeight-2*OY)||600;const k=Math.max(vb.w/pw,vb.h/ph);
   const route=routes[ri];const onRoute=new Set(route?route.nodes:[]);
   const hop=k<2.4?Math.min(1,(2.4-k)/0.7):0;
-  const tone=`filter:saturate(${1-0.35*hop}) sepia(${0.3*hop}) brightness(${1-0.08*hop})`;
   // a soft shadow under the parchment, so it reads as a sheet lying on the desk (stacked rings: cheap to pan)
   let s="";for(let k=6;k>=1;k--)s+=`<rect x="${-k*7}" y="${-k*7+10}" width="${MW+k*14}" height="${MH+k*14}" rx="${k*9}" fill="#000" opacity="${.045}"/>`;
-  s+=`<image href="azeroth.jpg" x="0" y="0" width="${MW}" height="${MH}" preserveAspectRatio="none" style="${tone}"/>`;
-  if(hop>0){s+=`<image href="azeroth-clean.jpg" x="0" y="0" width="${MW}" height="${MH}" preserveAspectRatio="none" style="opacity:${hop};${tone}"/>
-    <defs><mask id="landM" maskUnits="userSpaceOnUse" x="0" y="0" width="${MW}" height="${MH}"><image href="landmask.png" x="0" y="0" width="${MW}" height="${MH}" preserveAspectRatio="none"/></mask>
-    <mask id="seaM" maskUnits="userSpaceOnUse" x="0" y="0" width="${MW}" height="${MH}"><image href="seamask.png" x="0" y="0" width="${MW}" height="${MH}" preserveAspectRatio="none"/></mask>
-    <pattern id="grainP" patternUnits="userSpaceOnUse" width="60" height="60"><image href="grain.png" width="60" height="60"/></pattern>
-    <pattern id="seaP" patternUnits="userSpaceOnUse" width="420" height="280"><image href="seatex.png" width="420" height="280" preserveAspectRatio="none"/></pattern>
-    <pattern id="seaP2" patternUnits="userSpaceOnUse" width="150" height="100"><image href="seatex.png" width="150" height="100" preserveAspectRatio="none"/></pattern></defs>
-    <rect width="${MW}" height="${MH}" fill="#93703a" mask="url(#landM)" opacity="${.5*hop}"/><rect width="${MW}" height="${MH}" fill="url(#grainP)" mask="url(#landM)" style="mix-blend-mode:overlay" opacity="${.8*hop}"/>
-    <rect width="${MW}" height="${MH}" fill="url(#seaP)" mask="url(#seaM)" style="mix-blend-mode:overlay" opacity="${.75*hop}"/>${k<0.9?`<rect width="${MW}" height="${MH}" fill="url(#seaP2)" mask="url(#seaM)" style="mix-blend-mode:overlay" opacity="${Math.min(.5,0.9-k)*hop}"/>`:""}`;
+  s+=`<image href="azeroth.jpg" x="0" y="0" width="${MW}" height="${MH}" preserveAspectRatio="none"/>`;
+  // close in, the parchment is toned warmer with a land tint, paper grain and a sea texture. That look is baked into
+  // plain image tiles (source/data-tools/bake-map.js), which fade in as you zoom; drawing it live was slow on phones
+  // (right in close, a sharper set with a finer sea texture takes over)
+  if(hop>0){const deep=k<0.9?Math.min(1,(0.9-k)/0.5):0;
+    const tiles=(set,op)=>{for(let r=0;r*BT<MH;r++)for(let c=0;c*BT<MW;c++)if(inView(c*BT,r*BT,BT,BT))s+=`<image href="bake/${set}_${r}_${c}.webp" x="${c*BT}" y="${r*BT}" width="${BT+0.4}" height="${BT+0.4}" preserveAspectRatio="none" style="opacity:${op}"/>`};
+    if(deep<1)tiles("near",hop);if(deep>0)tiles("deep",deep*hop);
     for(const t of G.hires3)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]+0.4}" height="${t[4]+0.4}" preserveAspectRatio="none" style="opacity:${hop}"/>`}
   if(k<0.42)for(const c of G.cities)if(inView(c[1],c[2],c[3],c[4]))s+=`<image href="cities/${slug(c[0])}.webp" x="${c[1]}" y="${c[2]}" width="${c[3]}" height="${c[4]}" preserveAspectRatio="none" style="opacity:${Math.min(1,(0.42-k)/0.14)}"/>`;
   // Zephras Isle floats in Skywall (the plane of air); Blizzard gives it no place on Azeroth, so it is drawn in the open sky north of the Maelstrom, at true scale
-  if(G.isle){const [ix,iy,iw,ih]=G.isle;s+=`<defs><filter id="isleSh" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="${ih*.06}" stdDeviation="${ih*.035}" flood-color="#0d1a2a" flood-opacity=".55"/></filter>
-      <radialGradient id="isleGlow"><stop offset="0" stop-color="#eef6ff" stop-opacity=".45"/><stop offset="1" stop-color="#eef6ff" stop-opacity="0"/></radialGradient></defs>
-    <ellipse cx="${ix+iw/2}" cy="${iy+ih*.55}" rx="${iw*.78}" ry="${ih*.62}" fill="url(#isleGlow)"/>
-    <image href="zephras-isle.webp" x="${ix}" y="${iy}" width="${iw}" height="${ih}" preserveAspectRatio="none" filter="url(#isleSh)"/>
+  // (its halo and drop shadow are baked into the picture: source/data-tools/bake-sprites.js)
+  if(G.isle){const [ix,iy,iw,ih]=G.isle;s+=`<image href="isle-baked.webp" x="${ix-.3*iw}" y="${iy-.3*ih}" width="${1.6*iw}" height="${1.7*ih}" preserveAspectRatio="none"/>
     <text class="lb" data-p="2" x="${ix+iw/2}" y="${iy+ih+16*k}" text-anchor="middle" font-style="italic" font-size="${10.5*k}" fill="#eef3f8" stroke="#1b1208" stroke-width="${2.6*k}" opacity=".95">${k>=1.9?"Zephras Isle · ":""}Skywall, plane of air</text>`}
   if(k<1.9){s+=`<g text-anchor="middle" font-style="italic" stroke-width="${2.6*k}">`;
     for(const z of G.zones)s+=`<text class="lb" data-p="3" data-zr="${z[2]},${z[3]},${z[4]},${z[5]}" x="${z[2]+z[4]/2}" y="${z[3]+z[5]/2}" font-size="${11*k}" fill="${z[6]?"#ffd36b":"#f3ead7"}" opacity=".9">${esc(z[0])}${z[1]?` <tspan font-size="${10*k}">${z[1]}</tspan>`:""}</text>`;s+=`</g>`}
@@ -250,7 +246,8 @@ function draw(){
   // the game's own boat and zeppelin icons at each dock and tower; bigger for the ones this route uses
   {const used=new Set(route?route.legs.filter(l=>l.kind=="ride").map(l=>l.route):[]);
     // a soft light glow that follows each icon's own outline (no circle), so it stands off the parchment
-    s+=`<defs><filter id="dockglow" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB"><feMorphology in="SourceAlpha" operator="dilate" radius="${(2*k).toFixed(2)}" result="d"/><feGaussianBlur in="d" stdDeviation="${(2.6*k).toFixed(2)}" result="b"/><feFlood flood-color="#fff6dc" flood-opacity=".95"/><feComposite in2="b" operator="in" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g style="pointer-events:none">`;
+    // (the soft cream glow is baked into the icon: source/data-tools/bake-sprites.js)
+    s+=`<g style="pointer-events:none">`;
     // boats and zeppelins use the game icons trimmed to their artwork, so both show at the same size even fully
     // zoomed out
     const ic=34*k,R=ic/2,legs=route?route.legs.filter(l=>l.kind=="ride"):[];
@@ -264,7 +261,7 @@ function draw(){
        if(!moved)break}}
     PIER_BOXES=ds.map(d=>({x:d.x-R*.8,y:d.y-R*.8,w:R*1.6,h:R*1.6}));
     for(const d of ds){const on=legs.some(l=>l.route==d.route&&(!d.pairs||d.pairs.some(([a,b])=>(l.a==a&&l.b==b)||(l.a==b&&l.b==a))||d.route==LOOP&&(l.a==d.town||l.b==d.town)));
-      s+=`<g style="pointer-events:auto;cursor:help"><title>${dockTip(d)}</title><image href="icons/${d.kd=="b"?"boat":"zeppelin"}-m.png" x="${d.x-ic/2}" y="${d.y-ic/2}" width="${ic}" height="${ic}" opacity="${route&&!on?.85:1}" filter="url(#dockglow)"/></g>`}
+      s+=`<g style="pointer-events:auto;cursor:help"><title>${dockTip(d)}</title><image href="icons/${d.kd=="b"?"boat":"zeppelin"}-glow.png" x="${d.x-ic*.9}" y="${d.y-ic*.9}" width="${ic*1.8}" height="${ic*1.8}" opacity="${route&&!on?.85:1}"/></g>`}
     s+=`</g>`}
   s+=`<g>`;
   for(const id in N){const o=N[id];if(!vis(id))continue;const em=onRoute.has(o.id)||o.id==from||o.id==to||o.id==popId;
