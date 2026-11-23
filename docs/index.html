@@ -76,6 +76,14 @@ h1{font-family:var(--sys);font-weight:800;letter-spacing:-.01em;font-size:18px;l
 img.hsi{width:20px;height:20px;display:inline-block;vertical-align:middle;filter:drop-shadow(0 0 1px rgba(0,0,0,.5)) drop-shadow(0 0 3px rgba(110,200,255,.95))}
 .sub.hsub{display:flex;align-items:center;gap:7px}.sub.hsub img.hsi{width:18px;height:18px}
 ol.steps li .sic img.hsi{width:16px;height:16px;vertical-align:-3px;margin:0 5px 0 0}
+/* Google Maps-style scrollbars on the panel and the dropdowns: thin and light, with no arrow buttons, darker under
+   the pointer (Chrome, Edge and Safari use the ::-webkit-scrollbar rules, Firefox the standard ones) */
+.card::-webkit-scrollbar,.sugg::-webkit-scrollbar{width:8px;height:8px;background:transparent}
+.card::-webkit-scrollbar-button,.sugg::-webkit-scrollbar-button{display:none;width:0;height:0}
+.card::-webkit-scrollbar-track,.sugg::-webkit-scrollbar-track{background:transparent}
+.card::-webkit-scrollbar-thumb,.sugg::-webkit-scrollbar-thumb{background-color:light-dark(rgba(60,64,67,.28),rgba(232,234,237,.25));border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+.card::-webkit-scrollbar-thumb:hover,.sugg::-webkit-scrollbar-thumb:hover{background-color:light-dark(rgba(60,64,67,.55),rgba(232,234,237,.5))}
+@supports not selector(::-webkit-scrollbar){.card,.sugg{scrollbar-width:thin;scrollbar-color:light-dark(rgba(60,64,67,.35),rgba(232,234,237,.3)) transparent}}
 /* stops on the way: a small ring on the dotted line */
 .stops.hasvia~#swap{visibility:hidden}/* with stops, reorder by dragging instead (as Google Maps does) */
 .stop.via .slot{position:relative;align-self:stretch}
