@@ -358,7 +358,7 @@ function renderRoutes(){const box=$("routes");
     const name=mid.length?`via ${mid.slice(0,2).join(", ")}${mid.length>2?"…":""}`:main.kind=="fly"?(main.via&&main.via.length?`One flight, ${main.via.length} stop${main.via.length>1?"s":""}`:"Direct flight"):esc(main.label=="portal"?"Portal":main.label||"Ride");
     const sum=`<div class="rhead"><span class="rmode">${icon(main)}</span><div class="rt"><div class="rname">${name}</div>${why[i]?`<div class="rwhy">${why[i]}</div>`:""}</div><div class="rnum"><b>${fmtTot(r.total)}</b>${r.fare?`<small>${money(r.fare)}</small>`:routes.some(o=>o.fare)?`<small>Free</small>`:""}</div></div>`;
     const one=st.length==1;
-    const list=i==ri&&!(one&&!(st[0].via||[]).length)?`<ol class="steps">${st.map(s=>`<li${s.via&&s.via.length?' class="via"':""}>${icon(s)}<div>${
+    const list=i==ri&&!(one&&!(st[0].via||[]).length)?`<ol class="steps">${st.map((s,k)=>`<li${s.via&&s.via.length?' class="via"':""}><span class="num">${k+1}</span><div><span class="sic">${icon(s)}</span>${
       s.kind=="fly"?`Fly to ${nz(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}</li>`).join("")}</ul>`:""}${one?"":`<div class="t">${fmtT(s.t)}${s.rebook?" · new flight":""}</div>`}`:
       s.kind=="ride"?`${s.label} to ${nz(s.b)}<div class="t">5 min${s.route==LOOP?" · one-way loop":""}</div>`:
       s.kind=="tele"?(s.label==TRANSPONDER?`Teleporter to ${nz(s.b)}<div class="t">&lt;1 min</div>`:`${esc(s.label)}${s.label=="Hearthstone"?` to ${nz(s.b)}`:""}<div class="t">10 sec cast</div>`):
@@ -368,7 +368,8 @@ function renderRoutes(){const box=$("routes");
 
 function charSummary(){const hs=ch.hearth[fac],p=[];if(hs!=null&&N[hs]&&N[hs].f.has(fac))p.push("Hearth: "+N[hs].name);
   if(ch.mage)p.push("Mage "+ch.mage);if(ch.druid)p.push("Druid");if(ch.gadget)p.push("Gadgetzan");if(ch.ever)p.push("Everlook");if(ch.gnome&&fac=="H")p.push("Gnomeregan");
-  $("charSum").textContent=p.length?p.join(" · "):"Hearthstone, class teleports, engineering"}
+  $("charSum").textContent=p.length?p.join(" · "):"Hearthstone, class teleports, engineering";
+  $("cpSum").textContent=p.filter(x=>!x.startsWith("Hearth:")).join(" · ")||"Mage, Druid, Engineering"+(fac=="H"?", quest teleporter":"")}
 const hearthList=q=>{q=(q||"").trim().toLowerCase();const seen=new Set();
   return Object.values(N).filter(o=>(o.fp||o.town)&&o.f.has(fac)&&!o.druid&&o.id!=-110).sort((a,b)=>a.name.localeCompare(b.name))
    .filter(o=>!seen.has(o.name)&&seen.add(o.name)).filter(o=>!q||o.name.toLowerCase().includes(q)||o.zone.toLowerCase().includes(q))
@@ -408,7 +409,9 @@ function syncInputs(){const hs=ch.hearth[fac],hv=hs!=null&&N[hs]&&N[hs].f.has(fa
   [["fromIn","xFrom",from],["toIn","xTo",to],["hearthIn","xHearth",hv]].forEach(([i,x,v])=>{const inp=$(i);if(document.activeElement!=inp)inp.value=v!=null?N[v].name:""; // never overwrite what's being typed
 $(x).hidden=v==null;
     const fd=inp.parentNode;if(v!=null){fd.dataset.f=catOf(N[v]);fd.title=CATN[catOf(N[v])]}else{delete fd.dataset.f;fd.removeAttribute("title")}})}
-const setFrom=id=>{from=id;popId=null;sheet("peek");update(true)},setTo=id=>{to=id;popId=null;sheet("peek");update(true)};
+const setFrom=id=>{from=id;popId=null;sheet("peek");update(true)},
+  // a place picked in the search box is the destination; the panel opens and asks where you're starting
+  setTo=id=>{const was=document.body.classList.contains("search");to=id;popId=null;sheet("peek");update(true);if(was&&to!=null&&from==null){fit([to]);draw();setTimeout(()=>$("fromIn").focus(),140)}};
 combo($("fromIn"),$("sgFrom"),$("xFrom"),setFrom,()=>from);combo($("toIn"),$("sgTo"),$("xTo"),setTo,()=>to);
 const setHearth=id=>{ch.hearth[fac]=id;save();update(true)};
 combo($("hearthIn"),$("sgHearth"),$("xHearth"),setHearth,()=>ch.hearth[fac],hearthList,true);
@@ -440,7 +443,7 @@ const fitRoute=()=>{const r=routes[ri];if(r&&r.nodes&&r.nodes.length)fit(r.nodes
 // out as zooming goes
 let homeW=MW,fitW=0;const maxW=()=>Math.max(homeW,fitW);
 const FILL=true;
-const homeView=()=>{const r=screenBox();const docked=document.body.classList.contains("docked")&&innerWidth>700;const card=docked?{right:-8,height:0}:document.querySelector(".card").getBoundingClientRect();const narrow=innerWidth<=700;
+const homeView=()=>{const r=screenBox();const wide=document.body.classList.contains("search")&&innerWidth>700;const card=wide?{right:-8,height:0}:document.querySelector(".card").getBoundingClientRect();const narrow=innerWidth<=700;
   // phones open on your faction's home continent (Alliance: Eastern Kingdoms, Horde: Kalimdor), and the map always
   // fills the screen; bigger screens show all the land
   const half=o=>fac=="A"?o.x>MW/2:o.x<MW/2;
@@ -474,8 +477,11 @@ function renderStatic(){
 const linkFor=()=>{const p=new URLSearchParams({f:fac});const sl=id=>slug(N[id].name).replace(/^-|-$/g,"");if(from!=null)p.set("from",sl(from));if(to!=null)p.set("to",sl(to));return p.toString()};
 const syncLink=()=>{const has=from!=null||to!=null;$("shareRow").hidden=!(from!=null&&to!=null);
   try{history.replaceState(null,"",has?"?"+linkFor():location.pathname)}catch(e){}};
+// bigger screens open on one search box; it becomes the directions panel once a start or destination is chosen
+const searchMode=()=>{const on=!phone.matches&&from==null&&to==null;document.body.classList.toggle("search",on);
+  $("toIn").placeholder=on?"Search a place or dungeon":"Choose destination";return on};
 function update(refit){
-  document.documentElement.dataset.fac=fac;
+  document.documentElement.dataset.fac=fac;searchMode();
   $("fA").setAttribute("aria-pressed",fac=="A");$("fH").setAttribute("aria-pressed",fac=="H");
   if(from!=null&&!vis(from))from=null;if(to!=null&&!vis(to))to=null;
   syncInputs();solve();renderRoutes();syncChar();renderStatic();
@@ -485,11 +491,9 @@ function update(refit){
   if(popId==null)$("pop").hidden=true;syncLink();draw()}
 
 // ---- events ----
-// a starter route so the map shows something on arrival: Stormwind to Ratchet, Orgrimmar to Booty Bay. Switching faction
-// swaps it for the other faction's, unless you've already picked your own route
-const STARTER={A:[2,80],H:[23,18]};
-const isStarter=f=>from==STARTER[f][0]&&to==STARTER[f][1];
-const pickFac=f=>{if(f==fac)return;if(isStarter(fac)||(from==null&&to==null&&!phone.matches))[from,to]=STARTER[f];fac=f;save();homeView();update(false)};/* switching faction shows the whole world */
+const pickFac=f=>{if(f==fac)return;fac=f;save();homeView();update(false)};/* switching faction shows the whole world */
+// closing directions goes back to the search box and the whole world
+$("closeDir").onclick=()=>{from=to=null;popId=null;searchMode();homeView();update(false)};
 $("shareBtn").onclick=async()=>{const url=location.origin+location.pathname+"?"+linkFor(),lab=$("shareBtn").querySelector("span");
   let ok=false;try{await navigator.clipboard.writeText(url);ok=true}catch(e){try{const t=document.createElement("textarea");t.value=url;document.body.appendChild(t);t.select();ok=document.execCommand("copy");t.remove()}catch(e2){}}
   lab.textContent=ok?"Link copied":"Copy failed: "+url;setTimeout(()=>lab.textContent="Copy link to this route",2200)};
@@ -547,11 +551,7 @@ const ro=new ResizeObserver(()=>draw());ro.observe(svg);
 const fromLink=(()=>{try{const q=new URLSearchParams(location.search);const f=q.get("f");if(f!="A"&&f!="H")return false;
   const find=v=>{if(!v)return null;const c=Object.values(N).filter(o=>slug(o.name).replace(/^-|-$/g,"")==v&&o.f.has(f));return c.length?c[0].id:null};
   const a=find(q.get("from")),b=find(q.get("to"));if(a==null&&b==null)return false;fac=f;from=a;to=b;return true}catch(e){return false}})();
-if(!fromLink&&!phone.matches)[from,to]=STARTER[fac];/* phones start empty */
-// panel layout: docked to the left edge (default) or floating over the map; remembered between visits
-{const dockBtn=$("dock");const setDock=on=>{document.body.classList.toggle("docked",on);const l=on?"Float the panel over the map":"Dock the panel to the left";dockBtn.setAttribute("aria-label",l);dockBtn.title=l;dockBtn.setAttribute("aria-pressed",on)};
-  let docked=true;try{docked=localStorage.getItem("fmf-dock")!=="0"}catch(e){}setDock(docked);
-  dockBtn.onclick=()=>{docked=!docked;setDock(docked);try{localStorage.setItem("fmf-dock",docked?"1":"0")}catch(e){}homeView();draw()}}
+$("cpTog").onclick=()=>{const t=$("cpTog");t.setAttribute("aria-expanded",t.getAttribute("aria-expanded")!="true")};
 {const head=card.querySelector(".head");let s0=null,glideT=0;
   const fullH=()=>innerHeight-64,headH=()=>head.offsetHeight;
   // while it moves, the sheet is laid out once at full height and slid up and down (no layout on every frame)
@@ -575,10 +575,10 @@ if(!fromLink&&!phone.matches)[from,to]=STARTER[fac];/* phones start empty */
   $("routes").addEventListener("click",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")});
   ["fromIn","toIn","hearthIn"].forEach(i=>$(i).addEventListener("focus",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")}));
   $("charTog").onclick=()=>{const bar=$("charTog").parentNode,open=!bar.classList.contains("open");bar.classList.toggle("open",open);$("charTog").setAttribute("aria-expanded",open)};
-  phone.addEventListener("change",()=>{margins();sheet("peek");homeView();draw()})}
+  phone.addEventListener("change",()=>{margins();sheet("peek");searchMode();homeView();draw()})}
 // the margins: on phones only (large enough for most drags, small enough for the phone's graphics memory)
 const margins=()=>{const on=phone.matches;OX=on?Math.round(innerWidth*.4):0;OY=on?Math.round(innerHeight*.3):0;
   Object.assign(svg.style,on?{left:-OX+"px",top:-OY+"px",width:`calc(100% + ${2*OX}px)`,height:`calc(100% + ${2*OY}px)`}:{left:"",top:"",width:"",height:""})};
 margins();addEventListener("resize",()=>{const o=[OX,OY];margins();if(o[0]!=OX||o[1]!=OY){setVB();draw()}});
-sheet("peek");homeView();update(false);
+sheet("peek");searchMode();homeView();update(false);
 }

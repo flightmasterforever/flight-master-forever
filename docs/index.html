@@ -100,6 +100,16 @@ h1{font-family:var(--sys);font-weight:800;letter-spacing:-.01em;font-size:18px;l
 .charp{padding:10px 12px 12px;border-radius:12px;background:var(--field);display:grid;gap:8px}
 .sub{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:2px 0 -2px}
 .sub.sep{border-top:1px solid var(--rule);padding-top:10px;margin-top:4px}
+/* class, profession and quest teleports fold away under one row (bigger screens; phones fold "Your character" instead) */
+.cpbody{display:grid;gap:8px}
+.cptog{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;text-align:left;font:inherit;color:var(--ink);background:none;border:0;border-top:1px solid var(--rule);padding:10px 2px 2px;margin-top:4px;cursor:pointer}
+.cptog b{display:block;color:var(--acc);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.cptog small{display:block;color:var(--mute);font-size:13px;margin-top:2px}
+.cptog svg{flex:none;color:var(--mute);transition:transform .15s}
+.cptog[aria-expanded=true] svg{transform:rotate(180deg)}
+.cptog[aria-expanded=false]+.cpbody{display:none}
+@media (min-width:701px){.cpbody>.sub.sep:first-child{border-top:0;padding-top:2px}}
+@media (max-width:700px){.cptog{display:none}.cptog[aria-expanded=false]+.cpbody{display:grid}}
 .hint{font-size:12.5px;line-height:1.35;color:var(--mute);margin-top:-4px}.hint[hidden]{display:none}
 .row.mage{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:15px}.row.mage .seg button{min-width:38px;padding:4px 9px}
 .charp .field input{background:var(--panel);font-size:15px;min-height:40px;padding:8px 34px 8px 12px}
@@ -129,11 +139,14 @@ ol.steps{list-style:none;margin:10px 0 2px;padding:0}
 .rnum{text-align:right;white-space:nowrap;line-height:1.35}.rnum b{display:block;font-size:16px;color:var(--gold)}.rnum small{color:var(--mute);font-size:13px}
 .rcard{padding:12px 12px}.rcard+.rcard{border-top:1px solid var(--rule);border-radius:0}.rcard[aria-current=true]{border-radius:12px}.rcard[aria-current=true]+.rcard{border-top-color:transparent}
 .rcard[aria-current=true] ol.steps{margin-top:12px;padding-top:10px;border-top:1px solid var(--tintB,var(--rule))}
-ol.steps li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;padding:6px 0;position:relative}
+ol.steps li{display:grid;grid-template-columns:24px minmax(0,1fr);gap:8px;padding:6px 0;position:relative}
+/* each step has its number on the timeline and its way of travel beside the text */
+ol.steps .num{width:24px;height:24px;border-radius:50%;background:var(--gold);color:light-dark(#fff,#1b1208);font-weight:800;font-size:13px;display:grid;place-items:center;position:relative;z-index:1;box-shadow:0 0 0 2px var(--panel)}
+ol.steps li .sic svg{width:16px;height:16px;vertical-align:-3px;margin:0 5px 0 0}
 ol.steps li svg{width:20px;height:20px;color:var(--gold);margin-top:1px}
 ol.steps li svg{position:relative;z-index:1}
 /* every line leaves a 4px gap above and below the icons it joins */
-ol.steps li:not(:last-child)::before{content:"";position:absolute;left:10px;top:31px;bottom:-3px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--gold);opacity:.85}
+ol.steps li:not(:last-child)::before{content:"";position:absolute;left:12px;top:30px;bottom:-3px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--gold);opacity:.85}
 ol.steps li:not(:last-child)::after{display:none}
 ol.steps .hops{list-style:none;margin:3px 0 3px;padding:0;position:relative}
 /* the line through a flight's stops belongs to the stop list itself: from the plane icon down to the last stop, however the step ends */
@@ -216,13 +229,36 @@ i.fB{background:var(--B)!important;box-shadow:inset 0 0 0 1.5px var(--Bline)}
 .crests button:focus-visible{outline:2px solid #fff;outline-offset:2px;border-radius:8px}
 .head{padding:8px 10px 8px 14px}
 
-/* docked layout: the panel fills the left edge, full height, and the map takes the rest */
+/* bigger screens: the panel is a card inset from the left edge, full height, with the map showing around it */
 @media (min-width:701px){
-body.docked .card{top:0;left:0;bottom:0;height:100%;max-height:none;width:380px;border-radius:0;border-width:0 1px 0 0;box-shadow:4px 0 18px rgba(0,0,0,.25)}
-body.docked .card .head{border-radius:0}
-body.docked #map{left:380px;width:calc(100% - 380px)}}
-@media (max-width:700px){#dock{display:none}}
-#dock svg{width:18px;height:18px}
+.card{top:12px;left:12px;bottom:12px;width:380px;max-height:none}
+.head .close{flex:none;width:32px;height:32px;margin-left:2px;border:0;border-radius:50%;background:rgba(0,0,0,.25);color:#fff;font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center}
+.head .close:hover{background:rgba(0,0,0,.4)}
+/* on arrival (nothing chosen yet) the panel is one floating search box: logo, search, faction switch. Choosing a place
+   opens it into directions */
+body.search .card{bottom:auto;width:auto;overflow:visible;display:flex;align-items:center;gap:8px;padding:6px 6px 6px 10px;border-radius:30px;backdrop-filter:none;background:light-dark(#fffcf6,#181d23)}
+body.search .card>:not(.head):not(.fields){display:none}
+body.search .head{display:contents}
+body.search .head h1{flex:none;order:0}body.search .fields{order:1}body.search .crests{order:2}body.search .head h1 span,body.search .head .close{display:none}
+body.search .head h1 .logo{width:34px;height:34px;margin:0}
+body.search .fields{display:block;padding:0;width:340px}
+body.search .gut,body.search #swap,body.search .grip,body.search .slot,body.search .stop:has(.field.from){display:none}
+body.search .stops .stop .field::before{content:none}
+body.search .stops .stop .field input{border:0;background:none;box-shadow:none;padding:10px 40px 10px 6px;font-size:16px}
+body.search .field .x{right:0}
+body.search .field.to:not(:has(.x:not([hidden])))::after{content:"";position:absolute;right:10px;top:50%;width:20px;height:20px;margin-top:-10px;background:currentColor;color:var(--mute);pointer-events:none;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='8.5' cy='8.5' r='5.5'/%3E%3Cpath d='M13 13l4.5 4.5'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='8.5' cy='8.5' r='5.5'/%3E%3Cpath d='M13 13l4.5 4.5'/%3E%3C/svg%3E") center/contain no-repeat}
+body.search .stop .sugg{left:-52px;right:-102px;top:calc(100% + 12px)}
+/* the faction switch: both crests in a pill, a faction-coloured disc slides behind the chosen one */
+body.search .crests{position:relative;gap:0;padding:3px;border-radius:999px;background:var(--field);border:1px solid var(--rule);margin-left:2px}
+body.search .crests::before{content:"";position:absolute;top:3px;left:3px;width:40px;height:40px;border-radius:50%;background:var(--A);box-shadow:0 1px 4px rgba(0,0,0,.35);transition:transform .22s cubic-bezier(.2,.8,.2,1),background .22s}
+:root[data-fac=H] body.search .crests::before{transform:translateX(40px);background:var(--H)}
+body.search .crests button{width:40px;height:40px;transform:none}
+body.search .crests button::after{content:none}
+body.search .crests img{width:30px;height:30px}
+body.search .crests button[aria-pressed=true] img{filter:drop-shadow(0 0 1px #000) drop-shadow(0 1px 2px rgba(0,0,0,.6))}}
+@media (max-width:700px){.head .close{display:none}}
 .mitlic summary{cursor:pointer;color:var(--acc,var(--gold));margin-top:4px}.mitlic pre{white-space:pre-wrap;font-size:11.5px;line-height:1.45;background:var(--tint,rgba(0,0,0,.05));padding:10px 12px;border-radius:8px;margin:6px 0 0}
 .share{display:flex;justify-content:flex-end;padding:8px 16px 0}.share .linkbtn{display:inline-flex;align-items:center;gap:6px;font-size:13px}
 
@@ -273,14 +309,14 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
 @media (max-height:500px){.legend{display:none}}
 </style>
 </head>
-<body class="docked">
+<body>
 <svg id="map" role="img" aria-label="World map of flight points and routes"></svg>
 
 <section class="card" aria-label="Route planner">
   <div class="head">
     <span class="grab" aria-hidden="true"></span>
     <h1><img class="logo la" src="logo-alliance.svg" alt="" width="36" height="36"><img class="logo lh" src="logo-horde.svg" alt="" width="36" height="36"><span>Flight Master: Forever</span></h1>
-    <div class="crests" role="group" aria-label="Faction"><button id="fA" aria-pressed="true" aria-label="Alliance" title="Alliance"><img src="icons/crest-alliance.png" alt=""></button><button id="fH" aria-pressed="false" aria-label="Horde" title="Horde"><img src="icons/crest-horde.png" alt=""></button></div>
+    <div class="crests" role="group" aria-label="Faction"><button id="fA" aria-pressed="true" aria-label="Alliance" title="Alliance"><img src="icons/crest-alliance.png" alt=""></button><button id="fH" aria-pressed="false" aria-label="Horde" title="Horde"><img src="icons/crest-horde.png" alt=""></button></div><button class="close" id="closeDir" aria-label="Close directions" title="Close directions">×</button>
   </div>
   <div class="fields">
     <div class="stops" id="stops">
@@ -297,6 +333,8 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
       <div class="sub">Hearthstone</div>
       <div class="field hf"><input id="hearthIn" placeholder="Not set · search your inn" autocomplete="off" role="combobox" aria-label="Hearthstone location" aria-expanded="false" aria-controls="sgHearth"><button class="x" id="xHearth" aria-label="Clear hearthstone" hidden>×</button><ul class="sugg" id="sgHearth" role="listbox" hidden></ul></div>
       <div class="flegend" id="hLegend"></div>
+      <button class="cptog" id="cpTog" aria-expanded="false" aria-controls="cpBody"><span><b>Classes and professions</b><small id="cpSum"></small></span><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg></button>
+      <div class="cpbody" id="cpBody">
       <div class="sub sep">Class teleports</div>
       <div class="row mage">Mage <div class="seg" role="group" aria-label="Mage level"><button data-m="0" aria-pressed="true">None</button><button data-m="20" aria-pressed="false" title="Level 20+">20</button><button data-m="30" aria-pressed="false" title="Level 30+">30</button><button data-m="40" aria-pressed="false" title="Level 40+">40</button><button data-m="50" aria-pressed="false" title="Level 50+">50</button></div></div>
       <div class="hint" id="mageHint" hidden></div>
@@ -307,7 +345,8 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
       <div class="hordeOnly" id="questTp">
         <div class="sub sep">Quest unlocks <span class="tag">Horde</span></div>
         <label class="row opt"><span class="ot"><span>Gnomeregan Teleporter</span><small>Booty Bay ↔ Gnomeregan</small></span> <input type="checkbox" id="gnome"></label>
-        <div class="hint">Needs the Goblin Transponder from Scooty's quest "Gnomer-gooooone!" in Booty Bay.</div>
+        <div class="hint">Needs the Goblin Transponder from Scooty's quest <a href="https://www.wowhead.com/classic/quest=2843" target="_blank" rel="noopener">Gnomer-gooooone!</a> in Booty Bay.</div>
+      </div>
       </div>
     </div>
   </div>
@@ -318,7 +357,7 @@ body.docked #map{left:380px;width:calc(100% - 380px)}}
   <p class="fan">Unofficial fan project. Not affiliated with or endorsed by Blizzard Entertainment.</p>
 </section>
 
-<div class="ctl"><button id="dock" aria-label="Float the panel over the map" title="Float the panel over the map"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M7.5 3.5v13"/></svg></button><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zre" aria-label="Show the whole world">⟲</button></div>
+<div class="ctl"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zre" aria-label="Show the whole world">⟲</button></div>
 <div class="legend" id="legend"></div>
 <div class="pop" id="pop" hidden></div>
 
@@ -741,7 +780,7 @@ function renderRoutes(){const box=$("routes");
     const name=mid.length?`via ${mid.slice(0,2).join(", ")}${mid.length>2?"…":""}`:main.kind=="fly"?(main.via&&main.via.length?`One flight, ${main.via.length} stop${main.via.length>1?"s":""}`:"Direct flight"):esc(main.label=="portal"?"Portal":main.label||"Ride");
     const sum=`<div class="rhead"><span class="rmode">${icon(main)}</span><div class="rt"><div class="rname">${name}</div>${why[i]?`<div class="rwhy">${why[i]}</div>`:""}</div><div class="rnum"><b>${fmtTot(r.total)}</b>${r.fare?`<small>${money(r.fare)}</small>`:routes.some(o=>o.fare)?`<small>Free</small>`:""}</div></div>`;
     const one=st.length==1;
-    const list=i==ri&&!(one&&!(st[0].via||[]).length)?`<ol class="steps">${st.map(s=>`<li${s.via&&s.via.length?' class="via"':""}>${icon(s)}<div>${
+    const list=i==ri&&!(one&&!(st[0].via||[]).length)?`<ol class="steps">${st.map((s,k)=>`<li${s.via&&s.via.length?' class="via"':""}><span class="num">${k+1}</span><div><span class="sic">${icon(s)}</span>${
       s.kind=="fly"?`Fly to ${nz(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}</li>`).join("")}</ul>`:""}${one?"":`<div class="t">${fmtT(s.t)}${s.rebook?" · new flight":""}</div>`}`:
       s.kind=="ride"?`${s.label} to ${nz(s.b)}<div class="t">5 min${s.route==LOOP?" · one-way loop":""}</div>`:
       s.kind=="tele"?(s.label==TRANSPONDER?`Teleporter to ${nz(s.b)}<div class="t">&lt;1 min</div>`:`${esc(s.label)}${s.label=="Hearthstone"?` to ${nz(s.b)}`:""}<div class="t">10 sec cast</div>`):
@@ -751,7 +790,8 @@ function renderRoutes(){const box=$("routes");
 
 function charSummary(){const hs=ch.hearth[fac],p=[];if(hs!=null&&N[hs]&&N[hs].f.has(fac))p.push("Hearth: "+N[hs].name);
   if(ch.mage)p.push("Mage "+ch.mage);if(ch.druid)p.push("Druid");if(ch.gadget)p.push("Gadgetzan");if(ch.ever)p.push("Everlook");if(ch.gnome&&fac=="H")p.push("Gnomeregan");
-  $("charSum").textContent=p.length?p.join(" · "):"Hearthstone, class teleports, engineering"}
+  $("charSum").textContent=p.length?p.join(" · "):"Hearthstone, class teleports, engineering";
+  $("cpSum").textContent=p.filter(x=>!x.startsWith("Hearth:")).join(" · ")||"Mage, Druid, Engineering"+(fac=="H"?", quest teleporter":"")}
 const hearthList=q=>{q=(q||"").trim().toLowerCase();const seen=new Set();
   return Object.values(N).filter(o=>(o.fp||o.town)&&o.f.has(fac)&&!o.druid&&o.id!=-110).sort((a,b)=>a.name.localeCompare(b.name))
    .filter(o=>!seen.has(o.name)&&seen.add(o.name)).filter(o=>!q||o.name.toLowerCase().includes(q)||o.zone.toLowerCase().includes(q))
@@ -791,7 +831,9 @@ function syncInputs(){const hs=ch.hearth[fac],hv=hs!=null&&N[hs]&&N[hs].f.has(fa
   [["fromIn","xFrom",from],["toIn","xTo",to],["hearthIn","xHearth",hv]].forEach(([i,x,v])=>{const inp=$(i);if(document.activeElement!=inp)inp.value=v!=null?N[v].name:""; // never overwrite what's being typed
 $(x).hidden=v==null;
     const fd=inp.parentNode;if(v!=null){fd.dataset.f=catOf(N[v]);fd.title=CATN[catOf(N[v])]}else{delete fd.dataset.f;fd.removeAttribute("title")}})}
-const setFrom=id=>{from=id;popId=null;sheet("peek");update(true)},setTo=id=>{to=id;popId=null;sheet("peek");update(true)};
+const setFrom=id=>{from=id;popId=null;sheet("peek");update(true)},
+  // a place picked in the search box is the destination; the panel opens and asks where you're starting
+  setTo=id=>{const was=document.body.classList.contains("search");to=id;popId=null;sheet("peek");update(true);if(was&&to!=null&&from==null){fit([to]);draw();setTimeout(()=>$("fromIn").focus(),140)}};
 combo($("fromIn"),$("sgFrom"),$("xFrom"),setFrom,()=>from);combo($("toIn"),$("sgTo"),$("xTo"),setTo,()=>to);
 const setHearth=id=>{ch.hearth[fac]=id;save();update(true)};
 combo($("hearthIn"),$("sgHearth"),$("xHearth"),setHearth,()=>ch.hearth[fac],hearthList,true);
@@ -823,7 +865,7 @@ const fitRoute=()=>{const r=routes[ri];if(r&&r.nodes&&r.nodes.length)fit(r.nodes
 // out as zooming goes
 let homeW=MW,fitW=0;const maxW=()=>Math.max(homeW,fitW);
 const FILL=true;
-const homeView=()=>{const r=screenBox();const docked=document.body.classList.contains("docked")&&innerWidth>700;const card=docked?{right:-8,height:0}:document.querySelector(".card").getBoundingClientRect();const narrow=innerWidth<=700;
+const homeView=()=>{const r=screenBox();const wide=document.body.classList.contains("search")&&innerWidth>700;const card=wide?{right:-8,height:0}:document.querySelector(".card").getBoundingClientRect();const narrow=innerWidth<=700;
   // phones open on your faction's home continent (Alliance: Eastern Kingdoms, Horde: Kalimdor), and the map always
   // fills the screen; bigger screens show all the land
   const half=o=>fac=="A"?o.x>MW/2:o.x<MW/2;
@@ -857,8 +899,11 @@ function renderStatic(){
 const linkFor=()=>{const p=new URLSearchParams({f:fac});const sl=id=>slug(N[id].name).replace(/^-|-$/g,"");if(from!=null)p.set("from",sl(from));if(to!=null)p.set("to",sl(to));return p.toString()};
 const syncLink=()=>{const has=from!=null||to!=null;$("shareRow").hidden=!(from!=null&&to!=null);
   try{history.replaceState(null,"",has?"?"+linkFor():location.pathname)}catch(e){}};
+// bigger screens open on one search box; it becomes the directions panel once a start or destination is chosen
+const searchMode=()=>{const on=!phone.matches&&from==null&&to==null;document.body.classList.toggle("search",on);
+  $("toIn").placeholder=on?"Search a place or dungeon":"Choose destination";return on};
 function update(refit){
-  document.documentElement.dataset.fac=fac;
+  document.documentElement.dataset.fac=fac;searchMode();
   $("fA").setAttribute("aria-pressed",fac=="A");$("fH").setAttribute("aria-pressed",fac=="H");
   if(from!=null&&!vis(from))from=null;if(to!=null&&!vis(to))to=null;
   syncInputs();solve();renderRoutes();syncChar();renderStatic();
@@ -868,11 +913,9 @@ function update(refit){
   if(popId==null)$("pop").hidden=true;syncLink();draw()}
 
 // ---- events ----
-// a starter route so the map shows something on arrival: Stormwind to Ratchet, Orgrimmar to Booty Bay. Switching faction
-// swaps it for the other faction's, unless you've already picked your own route
-const STARTER={A:[2,80],H:[23,18]};
-const isStarter=f=>from==STARTER[f][0]&&to==STARTER[f][1];
-const pickFac=f=>{if(f==fac)return;if(isStarter(fac)||(from==null&&to==null&&!phone.matches))[from,to]=STARTER[f];fac=f;save();homeView();update(false)};/* switching faction shows the whole world */
+const pickFac=f=>{if(f==fac)return;fac=f;save();homeView();update(false)};/* switching faction shows the whole world */
+// closing directions goes back to the search box and the whole world
+$("closeDir").onclick=()=>{from=to=null;popId=null;searchMode();homeView();update(false)};
 $("shareBtn").onclick=async()=>{const url=location.origin+location.pathname+"?"+linkFor(),lab=$("shareBtn").querySelector("span");
   let ok=false;try{await navigator.clipboard.writeText(url);ok=true}catch(e){try{const t=document.createElement("textarea");t.value=url;document.body.appendChild(t);t.select();ok=document.execCommand("copy");t.remove()}catch(e2){}}
   lab.textContent=ok?"Link copied":"Copy failed: "+url;setTimeout(()=>lab.textContent="Copy link to this route",2200)};
@@ -930,11 +973,7 @@ const ro=new ResizeObserver(()=>draw());ro.observe(svg);
 const fromLink=(()=>{try{const q=new URLSearchParams(location.search);const f=q.get("f");if(f!="A"&&f!="H")return false;
   const find=v=>{if(!v)return null;const c=Object.values(N).filter(o=>slug(o.name).replace(/^-|-$/g,"")==v&&o.f.has(f));return c.length?c[0].id:null};
   const a=find(q.get("from")),b=find(q.get("to"));if(a==null&&b==null)return false;fac=f;from=a;to=b;return true}catch(e){return false}})();
-if(!fromLink&&!phone.matches)[from,to]=STARTER[fac];/* phones start empty */
-// panel layout: docked to the left edge (default) or floating over the map; remembered between visits
-{const dockBtn=$("dock");const setDock=on=>{document.body.classList.toggle("docked",on);const l=on?"Float the panel over the map":"Dock the panel to the left";dockBtn.setAttribute("aria-label",l);dockBtn.title=l;dockBtn.setAttribute("aria-pressed",on)};
-  let docked=true;try{docked=localStorage.getItem("fmf-dock")!=="0"}catch(e){}setDock(docked);
-  dockBtn.onclick=()=>{docked=!docked;setDock(docked);try{localStorage.setItem("fmf-dock",docked?"1":"0")}catch(e){}homeView();draw()}}
+$("cpTog").onclick=()=>{const t=$("cpTog");t.setAttribute("aria-expanded",t.getAttribute("aria-expanded")!="true")};
 {const head=card.querySelector(".head");let s0=null,glideT=0;
   const fullH=()=>innerHeight-64,headH=()=>head.offsetHeight;
   // while it moves, the sheet is laid out once at full height and slid up and down (no layout on every frame)
@@ -958,12 +997,12 @@ if(!fromLink&&!phone.matches)[from,to]=STARTER[fac];/* phones start empty */
   $("routes").addEventListener("click",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")});
   ["fromIn","toIn","hearthIn"].forEach(i=>$(i).addEventListener("focus",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")}));
   $("charTog").onclick=()=>{const bar=$("charTog").parentNode,open=!bar.classList.contains("open");bar.classList.toggle("open",open);$("charTog").setAttribute("aria-expanded",open)};
-  phone.addEventListener("change",()=>{margins();sheet("peek");homeView();draw()})}
+  phone.addEventListener("change",()=>{margins();sheet("peek");searchMode();homeView();draw()})}
 // the margins: on phones only (large enough for most drags, small enough for the phone's graphics memory)
 const margins=()=>{const on=phone.matches;OX=on?Math.round(innerWidth*.4):0;OY=on?Math.round(innerHeight*.3):0;
   Object.assign(svg.style,on?{left:-OX+"px",top:-OY+"px",width:`calc(100% + ${2*OX}px)`,height:`calc(100% + ${2*OY}px)`}:{left:"",top:"",width:"",height:""})};
 margins();addEventListener("resize",()=>{const o=[OX,OY];margins();if(o[0]!=OX||o[1]!=OY){setVB();draw()}});
-sheet("peek");homeView();update(false);
+sheet("peek");searchMode();homeView();update(false);
 }
 
 </script>
