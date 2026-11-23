@@ -72,8 +72,8 @@ h1{font-family:var(--sys);font-weight:800;letter-spacing:-.01em;font-size:18px;l
 .stops .field.from::before{content:"From"}
 .stops .field.to::before{content:"To"}
 .stops .field.via::before{content:"Stop"}
-/* the hearthstone's game icon: in the Hearthstone heading and on route steps that use it */
-img.hsi{width:20px;height:20px;border-radius:4px;display:inline-block;vertical-align:middle;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+/* the hearthstone (the game's icon art, cut out of its frame) with a soft blue glow: in the Hearthstone heading and on route steps that use it */
+img.hsi{width:20px;height:20px;display:inline-block;vertical-align:middle;filter:drop-shadow(0 0 1px rgba(0,0,0,.5)) drop-shadow(0 0 3px rgba(110,200,255,.95))}
 .sub.hsub{display:flex;align-items:center;gap:7px}.sub.hsub img.hsi{width:18px;height:18px}
 ol.steps li .sic img.hsi{width:16px;height:16px;vertical-align:-3px;margin:0 5px 0 0}
 /* stops on the way: a small ring on the dotted line */
