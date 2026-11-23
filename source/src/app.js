@@ -100,6 +100,7 @@ let fac="A",ch={hearth:{A:null,H:null},mage:0,druid:false,gadget:false,ever:fals
 try{fac=localStorage.getItem("fmf-fac")||"A";const c=JSON.parse(localStorage.getItem("fmf-char")||"null");if(c)ch={...ch,...c,hearth:{...ch.hearth,...(c.hearth||{})}}}catch(e){}
 const save=()=>{try{localStorage.setItem("fmf-fac",fac);localStorage.setItem("fmf-char",JSON.stringify(ch))}catch(e){}};
 let from=null,to=null,routes=[],ri=0,popId=null;
+let vias=[];/* stops on the way, in order (null: a stop row not filled in yet) */
 // Nighthaven's flight master is druid-only, but anyone can go there: it is shown and routed to (on foot from Moonglade) when picked
 const vis=id=>{const o=N[id];return !!o&&o.f.has(fac)&&(!o.druid||ch.druid||o.id==from||o.id==to)};
 const fly=id=>vis(id)&&(!N[id].druid||ch.druid);
@@ -264,7 +265,7 @@ function draw(){
       s+=`<g style="pointer-events:auto;cursor:help"><title>${dockTip(d)}</title><image href="icons/${d.kd=="b"?"boat":"zeppelin"}-glow.png" x="${d.x-ic*.9}" y="${d.y-ic*.9}" width="${ic*1.8}" height="${ic*1.8}" opacity="${route&&!on?.85:1}"/></g>`}
     s+=`</g>`}
   s+=`<g>`;
-  for(const id in N){const o=N[id];if(!vis(id))continue;const em=onRoute.has(o.id)||o.id==from||o.id==to||o.id==popId;
+  for(const id in N){const o=N[id];if(!vis(id))continue;const em=onRoute.has(o.id)||o.id==from||o.id==to||o.id==popId||vias.includes(o.id);
     const isH=ch.hearth[fac]==o.id;if(o.town&&!em&&!isH)continue;
     if(o.inst){const sz=(em?40:27)*k,ic=o.raid?"icons/raid.png":"icons/dungeon.png";
       // entrances that share a spot (Blackrock Mountain, Ahn'Qiraj) stack their names; names flip left when a flight point's name sits to the right
@@ -280,6 +281,7 @@ function draw(){
     s+=`<g class="n" data-n="${o.id}" style="cursor:pointer">${ring}${shape}${hb}<circle cx="${o.x}" cy="${o.y}" r="${13*k}" fill="transparent"/>${showL?`<text class="lb" data-p="${em?0:1}" data-fp="${o.x},${o.y},${r}" x="${o.x+r+4*k}" y="${o.y+4*k}" font-size="${(em?13.5:12)*k}" font-weight="${em?700:500}" fill="#fff" stroke-width="${3*k}">${esc(o.name)}</text>`:`<title>${esc(o.name)}</title>`}</g>`}
   // the start and destination match the panel: a hollow ring at the start, a red pin standing on the destination
   if(from!=null&&N[from]&&vis(from)){const o=N[from];s+=`<g style="pointer-events:none"><circle cx="${o.x}" cy="${o.y}" r="${11*k}" fill="none" stroke="#fff" stroke-width="${5.5*k}"/><circle cx="${o.x}" cy="${o.y}" r="${11*k}" fill="none" stroke="#1b1208" stroke-width="${3*k}"/></g>`}
+  for(const v of vias)if(v!=null&&N[v]&&vis(v)&&v!=from&&v!=to){const o=N[v];s+=`<circle style="pointer-events:none" cx="${o.x}" cy="${o.y}" r="${8*k}" fill="#fff" stroke="#1b1208" stroke-width="${3*k}"/>`}
   if(to!=null&&N[to]&&vis(to)){const o=N[to],ps=1.9*k;s+=`<g style="pointer-events:none" transform="translate(${o.x-7*ps},${o.y-18*ps}) scale(${ps})"><path d="M7 0a7 7 0 017 7c0 5-7 11-7 11S0 12 0 7a7 7 0 017-7zm0 4a3 3 0 100 6 3 3 0 000-6z" fill="#d9412b" stroke="#fff" stroke-width="1.2" paint-order="stroke"/></g>`}
   svg.innerHTML=s+`</g>`;
   declutter(k);
@@ -305,7 +307,7 @@ function graph(opt){const g={};const add=(a,b,c,kind,label,cost,extra)=>{if(opt.
   {const nh=Object.values(N).find(o=>o.druid&&o.f.has(fac)),mg=findNode("Moonglade",fac);if(nh&&mg)walk(nh.id,mg.id,20)}
   // Horde with the Goblin Transponder: Scooty's two-way teleporter, Booty Bay <-> the Gnomeregan entrance
   if(fac=="H"&&ch.gnome){const bb=findNode("Booty Bay","H");if(bb){add(bb.id,GNOMER,20,"tele",TRANSPONDER,0,{t:20});add(GNOMER,bb.id,20,"tele",TRANSPONDER,0,{t:20})}}
-  if(opt.tele&&from!=null){const T=(id,label)=>{if(id!=null&&vis(id)&&id!=from)add(from,id,10,"tele",label,0,{t:10})};
+  if(opt.tele&&from!=null){const T=(id,label)=>{if(id!=null&&vis(id)&&id!=from&&!(opt.used&&opt.used.has(label)))add(from,id,10,"tele",label,0,{t:10})};
     const h=ch.hearth[fac];if(h!=null&&N[h])T(h,"Hearthstone");
     if(ch.mage>=20){if(fac=="A"){T(2,"Teleport: Stormwind");T(6,"Teleport: Ironforge")}else{T(23,"Teleport: Orgrimmar");T(11,"Teleport: Undercity")}}
     if(ch.mage>=30){if(fac=="A")T(-104,"Teleport: Darnassus");else T(22,"Teleport: Thunder Bluff")}
@@ -320,7 +322,18 @@ function dijkstra(g){const d={[from]:0},prev={},done=new Set();
   if(d[to]==null)return null;
   const legs=[];let c=to;while(c!=from){const p=prev[c];legs.unshift({a:p.u,b:c,kind:p.e.kind,label:p.e.label,cost:p.e.cost||0,t:p.e.t||0,via:p.e.via||[],route:p.e.route});c=p.u}
   return {nodes:[from,...legs.map(l=>l.b)],legs,total:legs.reduce((s,l)=>s+l.t,0),fare:legs.reduce((s,l)=>s+l.cost,0)}}
-function solve(){routes=[];ri=0;if(from==null||to==null||from==to)return;
+// a trip with stops: the fastest way from each stop to the next, in the order given. A teleport or the hearthstone is
+// used at most once a trip (they have cooldowns); Scooty's teleporter can be used any time
+function solveChain(all){const pts=all.filter((p,i)=>i==0||p!=all[i-1]);if(pts.length<2)return;
+  const f0=from,t0=to,used=new Set(),legs=[],nodes=[pts[0]];let ok=true;
+  for(let i=0;i<pts.length-1;i++){from=pts[i];to=pts[i+1];const r=dijkstra(graph({tele:1,ride:1,used}));if(!r){ok=false;break}
+    r.legs.forEach(l=>{if(l.kind=="tele"&&l.label!=TRANSPONDER)used.add(l.label)});
+    if(i<pts.length-2&&r.legs.length)r.legs[r.legs.length-1].stopEnd=1;
+    legs.push(...r.legs);nodes.push(...r.nodes.slice(1))}
+  from=f0;to=t0;
+  routes=ok?[{nodes,legs,total:legs.reduce((s,l)=>s+l.t,0),fare:legs.reduce((s,l)=>s+l.cost,0),stops:pts.slice(1,-1)}]:[{none:1,nodes:[],legs:[]}]}
+function solve(){routes=[];ri=0;const vs=vias.filter(v=>v!=null);if(vs.length&&from!=null&&to!=null){solveChain([from,...vs,to]);return}
+  if(from==null||to==null||from==to)return;
   const cands=[];const sig=r=>r.legs.map(l=>l.kind[0]+[l.a,...(l.via||[]),l.b].join(">")).join("|");
   const tryOpt=o=>{const r=dijkstra(graph(o));if(r)cands.push(r)};
   tryOpt({tele:1,ride:1});tryOpt({tele:0,ride:1});tryOpt({tele:1,ride:0});tryOpt({tele:0,ride:0});
@@ -338,12 +351,12 @@ function solve(){routes=[];ri=0;if(from==null||to==null||from==to)return;
   if(plain&&routes.length<3&&!routes.some(p=>sig(p)==sig(plain)))routes.push(plain);
   if(!routes.length)routes=[{none:1,nodes:[],legs:[]}]}
 // each flight leg is one booking with the stops the game will fly; a booking right after another means landing first
-function steps(r){return r.legs.map((l,i)=>({...l,via:l.via||[],rebook:l.kind=="fly"&&i>0&&r.legs[i-1].kind=="fly"}))}
+function steps(r){return r.legs.map((l,i)=>({...l,via:l.via||[],rebook:l.kind=="fly"&&i>0&&r.legs[i-1].kind=="fly"&&!r.legs[i-1].stopEnd}))}
 
 // ---- card ----
 function renderRoutes(){const box=$("routes");
   if(from==null||to==null){box.innerHTML=`<p class="empty">${from==null?"Choose where you're starting, or "+(phone.matches?"tap":"click")+" a flight point on the map.":"Now choose a destination."}</p>`;return}
-  if(from==to){box.innerHTML=`<p class="empty">You're already there.</p>`;return}
+  if(!routes.length){box.innerHTML=`<p class="empty">You're already there.</p>`;return}
   if(routes[0].none){box.innerHTML=`<p class="empty">No route found between these two.</p>`;return}
   const nm=id=>esc(N[id].name);
   // a destination with its zone, as the game names it: "Booty Bay, Stranglethorn"
@@ -355,14 +368,14 @@ function renderRoutes(){const box=$("routes");
     // name a route by its stops that the other routes don't share, so two options never read the same
     const shared=id=>routes.length>1&&routes.every(o=>o.nodes.includes(id)),own=r.nodes.slice(1,-1).filter(id=>!shared(id));
     const mid=(own.length?own:r.nodes.slice(1,-1)).map(nm),main=st.reduce((m,s)=>s.t>m.t?s:m,st[0]);
-    const name=mid.length?`via ${mid.slice(0,2).join(", ")}${mid.length>2?"…":""}`:main.kind=="fly"?(main.via&&main.via.length?`One flight, ${main.via.length} stop${main.via.length>1?"s":""}`:"Direct flight"):esc(main.label=="portal"?"Portal":main.label||"Ride");
+    const name=r.stops?`Stops at ${r.stops.map(nm).join(", ")}`:mid.length?`via ${mid.slice(0,2).join(", ")}${mid.length>2?"…":""}`:main.kind=="fly"?(main.via&&main.via.length?`One flight, ${main.via.length} stop${main.via.length>1?"s":""}`:"Direct flight"):esc(main.label=="portal"?"Portal":main.label||"Ride");
     const sum=`<div class="rhead"><span class="rmode">${icon(main)}</span><div class="rt"><div class="rname">${name}</div>${why[i]?`<div class="rwhy">${why[i]}</div>`:""}</div><div class="rnum"><b>${fmtTot(r.total)}</b>${r.fare?`<small>${money(r.fare)}</small>`:routes.some(o=>o.fare)?`<small>Free</small>`:""}</div></div>`;
     const one=st.length==1;
     const list=i==ri&&!(one&&!(st[0].via||[]).length)?`<ol class="steps">${st.map((s,k)=>`<li${s.via&&s.via.length?' class="via"':""}><span class="num">${k+1}</span><div><span class="sic">${icon(s)}</span>${
       s.kind=="fly"?`Fly to ${nz(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}</li>`).join("")}</ul>`:""}${one?"":`<div class="t">${fmtT(s.t)}${s.rebook?" · new flight":""}</div>`}`:
       s.kind=="ride"?`${s.label} to ${nz(s.b)}<div class="t">5 min${s.route==LOOP?" · one-way loop":""}</div>`:
       s.kind=="tele"?(s.label==TRANSPONDER?`Teleporter to ${nz(s.b)}<div class="t">&lt;1 min</div>`:`${esc(s.label)}${s.label=="Hearthstone"?` to ${nz(s.b)}`:""}<div class="t">10 sec cast</div>`):
-      `${s.label=="portal"?"Take the portal":"Ride"} to ${nz(s.b)}<div class="t">${fmtT(s.t)}</div>`}</div></li>`).join("")}</ol>`:"";
+      `${s.label=="portal"?"Take the portal":"Ride"} to ${nz(s.b)}<div class="t">${fmtT(s.t)}</div>`}</div></li>${s.stopEnd?`<li class="stopmark"><span class="smk"></span><div>Stop at ${nz(s.b)}</div></li>`:""}`).join("")}</ol>`:"";
     return `<div class="rcard" data-r="${i}" ${i==ri?'aria-current="true"':'role="button" tabindex="0"'}>${sum}${list}</div>`}).join("");
   box.querySelectorAll('.rcard[data-r]').forEach(el=>{const go=()=>{const i=+el.dataset.r;if(i!=ri){ri=i;renderRoutes();fitRoute();draw()}};el.onclick=go;el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();go()}}})}
 
@@ -405,13 +418,22 @@ function combo(inp,ul,xb,set,cur,listFn=searchList,alwaysGroup=false){let items=
   inp.addEventListener("blur",()=>setTimeout(()=>{hide();syncInputs()},120));
   // X just clears the field; the list opens when you click into it
   xb.onclick=()=>{hide();inp.blur();inp.value="";set(null)}}
-function syncInputs(){const hs=ch.hearth[fac],hv=hs!=null&&N[hs]&&N[hs].f.has(fac)?hs:null;
+function syncInputs(){$("stops").querySelectorAll(".stop.via input").forEach((inp,i)=>{const v=vias[i];if(document.activeElement!=inp)inp.value=v!=null&&N[v]?N[v].name:"";const fd=inp.parentNode;if(v!=null&&N[v])fd.dataset.f=catOf(N[v]);else delete fd.dataset.f});const hs=ch.hearth[fac],hv=hs!=null&&N[hs]&&N[hs].f.has(fac)?hs:null;
   [["fromIn","xFrom",from],["toIn","xTo",to],["hearthIn","xHearth",hv]].forEach(([i,x,v])=>{const inp=$(i);if(document.activeElement!=inp)inp.value=v!=null?N[v].name:""; // never overwrite what's being typed
 $(x).hidden=v==null;
     const fd=inp.parentNode;if(v!=null){fd.dataset.f=catOf(N[v]);fd.title=CATN[catOf(N[v])]}else{delete fd.dataset.f;fd.removeAttribute("title")}})}
 const setFrom=id=>{from=id;popId=null;sheet("peek");update(true)},
   // a place picked in the search box is the destination; the panel opens and asks where you're starting
   setTo=id=>{const was=document.body.classList.contains("search");to=id;popId=null;sheet("peek");update(true);if(was&&to!=null&&from==null){fit([to]);draw();setTimeout(()=>$("fromIn").focus(),140)}};
+// stop rows between From and To ("Add stop"), visited in order
+function renderVias(){const box=$("stops"),toRow=$("toIn").closest(".stop");box.querySelectorAll(".stop.via").forEach(r=>r.remove());
+  vias.forEach((v,i)=>{const row=document.createElement("div");row.className="stop via";
+    row.innerHTML=`<span class="grip" aria-hidden="true"></span><span class="slot"><i class="vo"></i></span><div class="field via"><input placeholder="Choose a stop" autocomplete="off" role="combobox" aria-label="Stop ${i+1}" aria-expanded="false" aria-controls="sgV${i}"><button class="x" aria-label="Remove stop">×</button><ul class="sugg" id="sgV${i}" role="listbox" hidden></ul></div>`;
+    box.insertBefore(row,toRow);const inp=row.querySelector("input");inp.value=v!=null&&N[v]?N[v].name:"";
+    combo(inp,row.querySelector("ul"),row.querySelector(".x"),id=>setVia(i,id),()=>vias[i])});
+  box.classList.toggle("hasvia",vias.length>0)}
+function setVia(i,id){popId=null;if(id==null){vias.splice(i,1);renderVias()}else vias[i]=id;update(true)}
+$("addStop").onclick=()=>{if(vias.length>=3)return;vias.push(null);renderVias();update(false);const ins=$("stops").querySelectorAll(".stop.via input");ins[ins.length-1].focus()};
 combo($("fromIn"),$("sgFrom"),$("xFrom"),setFrom,()=>from);combo($("toIn"),$("sgTo"),$("xTo"),setTo,()=>to);
 const setHearth=id=>{ch.hearth[fac]=id;save();update(true)};
 combo($("hearthIn"),$("sgHearth"),$("xHearth"),setHearth,()=>ch.hearth[fac],hearthList,true);
@@ -474,16 +496,17 @@ function renderStatic(){
   $("legend").innerHTML=`<span><i style="background:var(--${fac})"></i>${fac=="A"?"Alliance":"Horde"}</span><span><i class="fB"></i>Both factions</span><span><img class="lic" src="icons/dungeon.png" alt="">Dungeon</span><span><img class="lic" src="icons/raid.png" alt="">Raid</span><span><i style="background:none;border:2px solid var(--new)"></i>New in Forever</span><span><img class="lic" src="icons/boat-m.png" alt="">Boat</span><span><img class="lic" src="icons/zeppelin-m.png" alt="">Zeppelin</span>`;
   const rows=[],seen=new Set();for(const t of [...G.trans,["Tram","Deeprun Tram","A"]]){if(seen.has(t[1]))continue;seen.add(t[1]);rows.push(t)}
   $("ttable").innerHTML=rows.map(t=>`<tr><td>${t[0]}${NEWR.has(t[1])?` <span class="badge" style="background:var(--new);color:#1b1b1b">New</span>`:""}</td><td>${esc(t[1]).replace(/ - /g," ↔ ")}${t[1]==LOOP?" (one-way loop: Menethil → Southshore → Auberdine → Menethil)":""}${t[0]=="Skyship"?" (Zephras Isle floats in Skywall; it's drawn north of the Maelstrom)":""}</td><td>${t[2]=="AH"?"Both":t[2]=="A"?"Alliance":"Horde"}</td></tr>`).join("")}
-const linkFor=()=>{const p=new URLSearchParams({f:fac});const sl=id=>slug(N[id].name).replace(/^-|-$/g,"");if(from!=null)p.set("from",sl(from));if(to!=null)p.set("to",sl(to));return p.toString()};
+const linkFor=()=>{const p=new URLSearchParams({f:fac});const sl=id=>slug(N[id].name).replace(/^-|-$/g,"");if(from!=null)p.set("from",sl(from));if(to!=null)p.set("to",sl(to));vias.forEach(v=>{if(v!=null)p.append("via",sl(v))});return p.toString()};
 const syncLink=()=>{const has=from!=null||to!=null;$("shareRow").hidden=!(from!=null&&to!=null);
   try{history.replaceState(null,"",has?"?"+linkFor():location.pathname)}catch(e){}};
 // bigger screens open on one search box; it becomes the directions panel once a start or destination is chosen
-const searchMode=()=>{const on=!phone.matches&&from==null&&to==null;document.body.classList.toggle("search",on);
+const searchMode=()=>{const on=!phone.matches&&from==null&&to==null&&!vias.length;document.body.classList.toggle("search",on);
   $("toIn").placeholder=on?"Search a place or dungeon":"Choose destination";return on};
 function update(refit){
   document.documentElement.dataset.fac=fac;searchMode();
   $("fA").setAttribute("aria-pressed",fac=="A");$("fH").setAttribute("aria-pressed",fac=="H");
-  if(from!=null&&!vis(from))from=null;if(to!=null&&!vis(to))to=null;
+  if(from!=null&&!vis(from))from=null;if(to!=null&&!vis(to))to=null;vias=vias.map(v=>v!=null&&!vis(v)?null:v);
+  $("addRow").hidden=!(from!=null&&to!=null&&vias.length<3);
   syncInputs();solve();renderRoutes();syncChar();renderStatic();
   if(popId!=null&&!vis(popId))closePop();
   syncSheet();
@@ -493,12 +516,12 @@ function update(refit){
 // ---- events ----
 const pickFac=f=>{if(f==fac)return;fac=f;save();homeView();update(false)};/* switching faction shows the whole world */
 // closing directions goes back to the search box and the whole world
-$("closeDir").onclick=()=>{from=to=null;popId=null;searchMode();homeView();update(false)};
+$("closeDir").onclick=()=>{from=to=null;vias=[];renderVias();popId=null;searchMode();homeView();update(false)};
 $("shareBtn").onclick=async()=>{const url=location.origin+location.pathname+"?"+linkFor(),lab=$("shareBtn").querySelector("span");
   let ok=false;try{await navigator.clipboard.writeText(url);ok=true}catch(e){try{const t=document.createElement("textarea");t.value=url;document.body.appendChild(t);t.select();ok=document.execCommand("copy");t.remove()}catch(e2){}}
   lab.textContent=ok?"Link copied":"Copy failed: "+url;setTimeout(()=>lab.textContent="Copy link to this route",2200)};
 $("fA").onclick=()=>pickFac("A");$("fH").onclick=()=>pickFac("H");
-const swapEnds=()=>{[from,to]=[to,from];sheet("peek");update(true)};
+const swapEnds=()=>{[from,to]=[to,from];if(vias.length){vias.reverse();renderVias()}sheet("peek");update(true)};
 $("swap").onclick=swapEnds;
 // drag to reorder (Google Maps style): drag a row by its handle past the other row's midpoint to swap
 (()=>{const box=$("stops"),rows=[...box.querySelectorAll(".stop")];
@@ -550,7 +573,7 @@ const ro=new ResizeObserver(()=>draw());ro.observe(svg);
 // shareable links: ?f=A&from=stormwind&to=ratchet opens that route. Names are matched within the faction
 const fromLink=(()=>{try{const q=new URLSearchParams(location.search);const f=q.get("f");if(f!="A"&&f!="H")return false;
   const find=v=>{if(!v)return null;const c=Object.values(N).filter(o=>slug(o.name).replace(/^-|-$/g,"")==v&&o.f.has(f));return c.length?c[0].id:null};
-  const a=find(q.get("from")),b=find(q.get("to"));if(a==null&&b==null)return false;fac=f;from=a;to=b;return true}catch(e){return false}})();
+  const a=find(q.get("from")),b=find(q.get("to"));if(a==null&&b==null)return false;fac=f;from=a;to=b;vias=q.getAll("via").map(find).filter(v=>v!=null).slice(0,3);return true}catch(e){return false}})();
 $("cpTog").onclick=()=>{const t=$("cpTog");t.setAttribute("aria-expanded",t.getAttribute("aria-expanded")!="true")};
 {const head=card.querySelector(".head");let s0=null,glideT=0;
   const fullH=()=>innerHeight-64,headH=()=>head.offsetHeight;
@@ -580,5 +603,5 @@ $("cpTog").onclick=()=>{const t=$("cpTog");t.setAttribute("aria-expanded",t.getA
 const margins=()=>{const on=phone.matches;OX=on?Math.round(innerWidth*.4):0;OY=on?Math.round(innerHeight*.3):0;
   Object.assign(svg.style,on?{left:-OX+"px",top:-OY+"px",width:`calc(100% + ${2*OX}px)`,height:`calc(100% + ${2*OY}px)`}:{left:"",top:"",width:"",height:""})};
 margins();addEventListener("resize",()=>{const o=[OX,OY];margins();if(o[0]!=OX||o[1]!=OY){setVB();draw()}});
-sheet("peek");searchMode();homeView();update(false);
+renderVias();sheet("peek");searchMode();homeView();update(false);
 }
