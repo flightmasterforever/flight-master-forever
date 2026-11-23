@@ -138,7 +138,19 @@ ol.steps .smk{width:16px;height:16px;margin:0 4px;border-radius:50%;background:#
 .cptog svg{flex:none;color:var(--mute);transition:transform .15s}
 .cptog[aria-expanded=true] svg{transform:rotate(180deg)}
 .cptog[aria-expanded=false]+.cpbody{display:none}
-@media (min-width:701px){.cpbody>.sub.sep:first-child{border-top:0;padding-top:2px}}
+/* desktop: Your character folds into one row (like phones), classes and professions show flat once it's open */
+@media (min-width:701px){
+  .charbar .charh{display:none}
+  .charbar .chartog{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;text-align:left;font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--rule);border-radius:12px;padding:10px 14px;min-height:52px;cursor:pointer}
+  .chartog small{display:block;color:var(--mute);font-size:13px;margin-top:1px}
+  .chartog svg{flex:none;color:var(--mute);transition:transform .15s}
+  .charbar.open .chartog{border-radius:12px 12px 0 0;border-bottom-color:transparent}
+  .charbar.open .chartog svg{transform:rotate(180deg)}
+  .charbar:not(.open) #charP{display:none}
+  .charbar.open #charP{border-radius:0 0 12px 12px}
+  .charbar .cptog{display:none}.charbar .cptog+.cpbody{display:grid}
+  .cpbody>.sub.sep:first-child{border-top:1px solid var(--rule);padding-top:10px}
+}
 @media (max-width:700px){.cptog{display:none}.cptog[aria-expanded=false]+.cpbody{display:grid}}
 .hint{font-size:12.5px;line-height:1.35;color:var(--mute);margin-top:-4px}.hint[hidden]{display:none}
 .row.mage{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:15px}.row.mage .seg button{min-width:38px;padding:4px 9px}
