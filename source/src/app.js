@@ -114,7 +114,7 @@ const IC={
  Tram:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 3h12a2 2 0 012 2v10a3 3 0 01-3 3l2 3h-2.5l-2-3h-5l-2 3H5l2-3a3 3 0 01-3-3V5a2 2 0 012-2zm0 3v5h12V6zm2 8a1 1 0 100 2 1 1 0 000-2zm8 0a1 1 0 100 2 1 1 0 000-2z"/></svg>',
  walk:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="13" cy="4" r="2"/><path d="M10 8l3-1 3 3 3 1-.5 2-4-1-1.5-1.5-1 4 3 3v5h-2v-4l-3-2.5-1.5 6.5H6l2.3-10.5L7 11v3H5V10z"/></svg>',
  tele:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8zM19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9zM5 15l.7 1.6L7.3 17l-1.6.7L5 19.3l-.7-1.6L2.7 17l1.6-.4z"/></svg>',
- hearth:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3L3 10.5V21h6.5v-6h5v6H21V10.5z"/></svg>'};
+ hearth:'<img class="hsi" src="icons/hearthstone.png" alt="" width="20" height="20">'};/* the game's own hearthstone icon (INV_Misc_Rune_01) */
 const icon=l=>l.kind=="fly"?IC.fly:l.kind=="ride"?IC[l.label]||IC.Boat:l.kind=="walk"?IC.walk:l.label=="Hearthstone"?IC.hearth:IC.tele;
 
 // ---- map drawing ----
@@ -428,7 +428,7 @@ const setFrom=id=>{from=id;popId=null;sheet("peek");update(true)},
 // stop rows between From and To ("Add stop"), visited in order
 function renderVias(){const box=$("stops"),toRow=$("toIn").closest(".stop");box.querySelectorAll(".stop.via").forEach(r=>r.remove());
   vias.forEach((v,i)=>{const row=document.createElement("div");row.className="stop via";
-    row.innerHTML=`<span class="grip" aria-hidden="true"></span><span class="slot"><i class="vo"></i></span><div class="field via"><input placeholder="Choose a stop" autocomplete="off" role="combobox" aria-label="Stop ${i+1}" aria-expanded="false" aria-controls="sgV${i}"><button class="x" aria-label="Remove stop">×</button><ul class="sugg" id="sgV${i}" role="listbox" hidden></ul></div>`;
+    row.innerHTML=`<button class="grip" aria-label="Reorder (drag, or use arrow keys)"><svg viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="2" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="2" cy="14" r="1.6"/><circle cx="8" cy="14" r="1.6"/></svg></button><span class="slot"><i class="vo"></i></span><div class="field via"><input placeholder="Choose a stop" autocomplete="off" role="combobox" aria-label="Stop ${i+1}" aria-expanded="false" aria-controls="sgV${i}"><button class="x" aria-label="Remove stop">×</button><ul class="sugg" id="sgV${i}" role="listbox" hidden></ul></div>`;
     box.insertBefore(row,toRow);const inp=row.querySelector("input");inp.value=v!=null&&N[v]?N[v].name:"";
     combo(inp,row.querySelector("ul"),row.querySelector(".x"),id=>setVia(i,id),()=>vias[i])});
   box.classList.toggle("hasvia",vias.length>0)}
@@ -523,23 +523,27 @@ $("shareBtn").onclick=async()=>{const url=location.origin+location.pathname+"?"+
 $("fA").onclick=()=>pickFac("A");$("fH").onclick=()=>pickFac("H");
 const swapEnds=()=>{[from,to]=[to,from];if(vias.length){vias.reverse();renderVias()}sheet("peek");update(true)};
 $("swap").onclick=swapEnds;
-// drag to reorder (Google Maps style): drag a row by its handle past the other row's midpoint to swap
-(()=>{const box=$("stops"),rows=[...box.querySelectorAll(".stop")];
-  rows.forEach((row,idx)=>{const g=row.querySelector(".grip"),other=rows[1-idx];let y0=null,step=0,crossed=false;
-    const end=()=>{if(y0==null)return;y0=null;box.classList.remove("dragging");
-      if(crossed){row.classList.remove("dragging");row.style.transform=`translateY(${idx?-step:step}px)`;
-        setTimeout(()=>{box.classList.add("snap");row.style.transform=other.style.transform="";swapEnds();
-          requestAnimationFrame(()=>requestAnimationFrame(()=>box.classList.remove("snap")))},180)}
-      else{row.classList.remove("dragging");row.style.transform=other.style.transform=""}};
-    g.addEventListener("pointerdown",e=>{if(e.button)return;e.preventDefault();g.setPointerCapture(e.pointerId);
-      y0=e.clientY;step=Math.abs(rows[1].offsetTop-rows[0].offsetTop);crossed=false;row.classList.add("dragging");box.classList.add("dragging")});
-    g.addEventListener("pointermove",e=>{if(y0==null)return;let dy=e.clientY-y0;
-      dy=idx?Math.max(-step-8,Math.min(8,dy)):Math.max(-8,Math.min(step+8,dy));
-      row.style.transform=`translateY(${dy}px)`;crossed=idx?dy<-step/2:dy>step/2;
-      other.style.transform=crossed?`translateY(${idx?step:-step}px)`:""});
-    g.addEventListener("pointerup",end);g.addEventListener("pointercancel",end);
-    g.addEventListener("keydown",e=>{if((e.key=="ArrowDown"&&!idx)||(e.key=="ArrowUp"&&idx)){e.preventDefault();swapEnds();rows[1-idx].querySelector(".grip").focus()}});
-  })})();
+// drag to reorder (Google Maps style): drag any row (start, stops, destination) by its handle; the others make room.
+// Arrow keys on a handle move that row up or down
+(()=>{const box=$("stops");let st=null;
+  const rowsNow=()=>[...box.querySelectorAll(".stop")];
+  const move=(i,j)=>{if(i==j)return;const a=[from,...vias,to];const [x]=a.splice(i,1);a.splice(j,0,x);
+    from=a[0];to=a[a.length-1];vias=a.slice(1,-1);renderVias();sheet("peek");update(true)};
+  box.addEventListener("pointerdown",e=>{const g=e.target.closest(".grip");if(!g||e.button)return;e.preventDefault();
+    const rows=rowsNow(),row=g.closest(".stop"),i=rows.indexOf(row);g.setPointerCapture(e.pointerId);
+    st={row,rows,i,j:i,y0:e.clientY,step:rows[1].offsetTop-rows[0].offsetTop};row.classList.add("dragging");box.classList.add("dragging")});
+  box.addEventListener("pointermove",e=>{if(!st)return;const n=st.rows.length;
+    const dy=Math.max(-st.i*st.step-8,Math.min((n-1-st.i)*st.step+8,e.clientY-st.y0));st.row.style.transform=`translateY(${dy}px)`;
+    const j=st.j=Math.max(0,Math.min(n-1,st.i+Math.round(dy/st.step)));
+    st.rows.forEach((r,k)=>{if(r==st.row)return;const s=j>st.i&&k>st.i&&k<=j?-st.step:j<st.i&&k<st.i&&k>=j?st.step:0;r.style.transform=s?`translateY(${s}px)`:""})});
+  const end=()=>{if(!st)return;const s=st;st=null;box.classList.remove("dragging");s.row.classList.remove("dragging");
+    if(s.j==s.i){s.rows.forEach(r=>r.style.transform="");return}
+    s.row.style.transform=`translateY(${(s.j-s.i)*s.step}px)`;
+    setTimeout(()=>{box.classList.add("snap");s.rows.forEach(r=>r.style.transform="");move(s.i,s.j);
+      requestAnimationFrame(()=>requestAnimationFrame(()=>box.classList.remove("snap")))},180)};
+  box.addEventListener("pointerup",end);box.addEventListener("pointercancel",end);
+  box.addEventListener("keydown",e=>{const g=e.target.closest(".grip");if(!g)return;const rows=rowsNow(),i=rows.indexOf(g.closest(".stop"));
+    const j=e.key=="ArrowDown"?i+1:e.key=="ArrowUp"?i-1:-1;if(j<0||j>=rows.length)return;e.preventDefault();move(i,j);rowsNow()[j].querySelector(".grip").focus()})})();
 
 document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{ch.mage=+b.dataset.m;save();update(true)});
 $("druid").onchange=e=>{ch.druid=e.target.checked;save();update(true)};$("gnome").onchange=e=>{ch.gnome=e.target.checked;save();update(true)};$("gadget").onchange=e=>{ch.gadget=e.target.checked;save();update(true)};$("ever").onchange=e=>{ch.ever=e.target.checked;save();update(true)};
