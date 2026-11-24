@@ -225,7 +225,12 @@ function draw(){
   if(hop>0){const deep=k<0.9?Math.min(1,(0.9-k)/0.5):0;
     const tiles=(set,op)=>{for(let r=0;r*BT<MH;r++)for(let c=0;c*BT<MW;c++)if(inView(c*BT,r*BT,BT,BT))s+=`<image href="bake/${set}_${r}_${c}.webp" x="${c*BT}" y="${r*BT}" width="${BT+0.4}" height="${BT+0.4}" preserveAspectRatio="none" style="opacity:${op}"/>`};
     if(deep<1)tiles("near",hop);if(deep>0)tiles("deep",deep*hop);
-    for(const t of G.hires3)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]+0.4}" height="${t[4]+0.4}" preserveAspectRatio="none" style="opacity:${hop}"/>`}
+    for(const t of G.hires3)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]+0.4}" height="${t[4]+0.4}" preserveAspectRatio="none" style="opacity:${hop}"/>`;
+    // the zone art above is ~3.5 pixels a map unit, which squeezes the small zones (their place names end up a few
+    // pixels tall). Zoomed in past that, each small zone's own full-size game map goes on top, soft-edged and
+    // colour-matched (source/data-tools/zone-art.py); only the zones on screen are fetched, and only this close in
+    const zq=(window.devicePixelRatio||1)/k,zop=zq>3?Math.min(1,(zq-3)/0.8)*hop:0;
+    if(zop>0&&G.zart)for(const t of G.zart)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]}" height="${t[4]}" preserveAspectRatio="none" style="opacity:${zop}"/>`}
   if(k<0.42)for(const c of G.cities)if(inView(c[1],c[2],c[3],c[4]))s+=`<image href="cities/${slug(c[0])}.webp" x="${c[1]}" y="${c[2]}" width="${c[3]}" height="${c[4]}" preserveAspectRatio="none" style="opacity:${Math.min(1,(0.42-k)/0.14)}"/>`;
   // Zephras Isle floats in Skywall (the plane of air); Blizzard gives it no place on Azeroth, so it is drawn in the open sky north of the Maelstrom, at true scale
   // (its halo and drop shadow are baked into the picture: source/data-tools/bake-sprites.js)
