@@ -1,6 +1,6 @@
 {
 // ---- where Zephras Isle sits on the world map ----
-// Blizzard gives it no world-map position (it floats in Skywall), so it's placed here by hand: the centre of the
+// Blizzard gives it no world-map position (it floats in Skywall), so it's placed here by hand: the center of the
 // island in world-map units (the map is 3006 x 2004) and a size factor (1 = true scale, same yards as the continents).
 // Move it by changing these numbers; the art, towns, docks, skyship paths and label all follow.
 const ISLE_AT={x:1410,y:480,scale:1};
@@ -120,7 +120,7 @@ const icon=l=>l.kind=="fly"?IC.fly:l.kind=="ride"?IC[l.label]||IC.Boat:l.kind=="
 // ---- map drawing ----
 const svg=$("map");const home={x:0,y:0,w:MW,h:MH};let vb={...home};
 // the view stays on the parchment: dragging or zooming stops at its edges (if the view is ever wider or taller
-// than the sheet, it's centred on it instead). Set KEEP_ON_MAP to false to allow dragging off the edge again
+// than the sheet, it's centered on it instead). Set KEEP_ON_MAP to false to allow dragging off the edge again
 const KEEP_ON_MAP=true;
 // keep one axis on the parchment: inside it while zoomed in; while zoomed out past it (tall phone screens), the parchment
 // stays wholly in view but can sit anywhere, so a route can be framed above the bottom sheet
@@ -228,7 +228,7 @@ function draw(){
     for(const t of G.hires3)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]+0.4}" height="${t[4]+0.4}" preserveAspectRatio="none" style="opacity:${hop}"/>`;
     // the zone art above is ~3.5 pixels a map unit, which squeezes the small zones (their place names end up a few
     // pixels tall). Zoomed in past that, each small zone's own full-size game map goes on top, soft-edged and
-    // colour-matched (source/data-tools/zone-art.py); only the zones on screen are fetched, and only this close in
+    // color-matched (source/data-tools/zone-art.py); only the zones on screen are fetched, and only this close in
     const zq=(window.devicePixelRatio||1)/k,zop=zq>3?Math.min(1,(zq-3)/0.8)*hop:0;
     if(zop>0&&G.zart)for(const t of G.zart)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]}" height="${t[4]}" preserveAspectRatio="none" style="opacity:${zop}"/>`}
   if(k<0.42)for(const c of G.cities)if(inView(c[1],c[2],c[3],c[4]))s+=`<image href="cities/${slug(c[0])}.webp" x="${c[1]}" y="${c[2]}" width="${c[3]}" height="${c[4]}" preserveAspectRatio="none" style="opacity:${Math.min(1,(0.42-k)/0.14)}"/>`;
