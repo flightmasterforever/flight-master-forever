@@ -428,7 +428,7 @@ body.search .crests button[aria-pressed=true] img{filter:drop-shadow(0 0 1px #00
       <li>Zephras Isle floats in Skywall, the elemental plane of air, so Blizzard gives it no spot on the world map. It's drawn at true scale in the open sky north of the Maelstrom, from its own explored map, with the skyships from the Valanaar Skydocks to Dalaran (Alterac Mountains) and Skywatcher Plateau (Mulgore).</li>
       <li>Fares are the base prices from the game's flight tables. Reputation discounts aren't applied: at Honored or above with a flight master's faction you pay less in game (Honored takes 10% off, so 6s 30c becomes 5s 67c).</li>
       <li>Boat and zeppelin routes, docks and sailing paths come from the game's tables as compiled by the <a href="https://github.com/openmap-world/openmap">OpenMap</a> addon (MIT licence), as do the dungeon and raid entrances; the explored Zul'Gurub corner of Stranglethorn Vale uses the Classic Era client's overlay, because Forever's files don't include one yet; the open-sea stretches are routed around the land. Routes to a dungeon or raid end with a ride from the nearest flight point to its entrance. The new Menethil boat runs one way: Menethil → Southshore → Auberdine → Menethil.</li>
-      <li>Inn towns without a flight master (Goldshire, Kharanos, Dolanaar, Razor Hill, Bloodhoof Village, Brill) are placed from their in-game map coordinates, and the ride from them to the nearest flight master is estimated.</li>
+      <li>Inn towns without a flight master (Goldshire, Kharanos, Dolanaar, Razor Hill, Bloodhoof Village, Brill) are placed from their in-game map coordinates, and the run from them to the nearest flight master is estimated.</li>
       <li>Level ranges are Classic's, except the announced ones for the new zones (Riverglades 35–45, Shen'dralas 40–45, Mount Hyjal 60). Shen'dralas has no flight master yet; Powderfuse Port's are in the files but not active.</li>
       <li>The detailed map is built from every zone's fully discovered in-game map.</li>
     </ul>
@@ -845,7 +845,7 @@ function renderRoutes(){const box=$("routes");
       s.kind=="fly"?`Fly to ${nz(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}</li>`).join("")}</ul>`:""}${one?"":`<div class="t">${fmtT(s.t)}${s.rebook?" · new flight":""}</div>`}`:
       s.kind=="ride"?`${s.label} to ${nz(s.b)}<div class="t">5 min${s.route==LOOP?" · one-way loop":""}</div>`:
       s.kind=="tele"?(s.label==TRANSPONDER?`Teleporter to ${nz(s.b)}<div class="t">&lt;1 min</div>`:`${esc(s.label)}${s.label=="Hearthstone"?` to ${nz(s.b)}`:""}<div class="t">10 sec cast</div>`):
-      `${s.label=="portal"?"Take the portal":"Ride"} to ${nz(s.b)}<div class="t">${fmtT(s.t)}</div>`}</div></li>${s.stopEnd?`<li class="stopmark"><span class="smk"></span><div>Stop at ${nz(s.b)}</div></li>`:""}`).join("")}</ol>`:"";
+      `${s.label=="portal"?"Take the portal":"Run"} to ${nz(s.b)}<div class="t">${fmtT(s.t)}</div>`}</div></li>${s.stopEnd?`<li class="stopmark"><span class="smk"></span><div>Stop at ${nz(s.b)}</div></li>`:""}`).join("")}</ol>`:"";
     return `<div class="rcard" data-r="${i}" ${i==ri?'aria-current="true"':'role="button" tabindex="0"'}>${sum}${list}</div>`}).join("");
   box.querySelectorAll('.rcard[data-r]').forEach(el=>{const go=()=>{const i=+el.dataset.r;if(i!=ri){ri=i;renderRoutes();fitRoute();draw()}};el.onclick=go;el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();go()}}})}
 
