@@ -230,7 +230,8 @@ i.fB{background:var(--B)!important;box-shadow:inset 0 0 0 1.5px var(--Bline)}
 .sheet table{width:100%;border-collapse:collapse;font-size:15px}.sheet td,.sheet th{text-align:left;padding:6px;border-bottom:1px solid var(--rule);vertical-align:top}.sheet th{color:var(--mute);font-weight:500}
 .sheet li{margin:5px 0}.sheet a{color:inherit}
 :focus-visible{outline:3px solid var(--route);outline-offset:2px}
-@keyframes dash{to{stroke-dashoffset:-24}}.rline{animation:dash 1s linear infinite}
+/* each route line moves back one whole dash pattern per loop (--dash, set with its duration in app.js), so the speed on screen is the same at every zoom */
+@keyframes dash{to{stroke-dashoffset:var(--dash)}}.rline{animation:dash 1s linear infinite}
 @media(prefers-reduced-motion:reduce){.rline{animation:none}}
 @media(max-width:700px){
   .card{top:auto;bottom:0;left:0;right:0;width:auto;max-height:58%;border-radius:16px 16px 0 0}
@@ -622,6 +623,8 @@ const liveFrame=()=>{if(!live)return;live.raf=0;clampVB();const r=live.r,a=fitBo
 // (the view itself is set at once, so the map is in the right place meanwhile)
 const liveEnd=()=>{if(!live)return;cancelAnimationFrame(live.raf);live=null;svg.style.transform="";svg.classList.remove("moving");setVB();placePop();
   clearTimeout(redrawT);redrawT=setTimeout(()=>{draw();placePop()},phone.matches?350:140)};/* phones: pinches come in quick runs */
+// the route's marching dashes move this many screen pixels a second at every zoom level (the dash pattern is in map units, so its length is scaled by k)
+const DASH_PX_S=16;
 const pathD=p=>{let d="M"+p[0]+","+p[1];for(let k=2;k<p.length;k+=2)d+="L"+p[k]+","+p[k+1];return d};
 const sailPts=route=>{const out=[];for(const pc of (G.sails[route]||[]))for(const q of pc)out.push(q);return out};
 function curve(a,b){const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,d=Math.hypot(a.x-b.x,a.y-b.y);return `M${a.x},${a.y}Q${mx},${my-Math.min(300,d*.15)} ${b.x},${b.y}`}
@@ -708,8 +711,8 @@ function draw(){
   for(const [a,b] of G.walks){if(!vis(a)||!vis(b))continue;s+=`<line x1="${N[a].x}" y1="${N[a].y}" x2="${N[b].x}" y2="${N[b].y}" stroke="#f3ead7" stroke-opacity="${.6*dim}" stroke-width="${1.1*k}" stroke-dasharray="${1*k} ${3*k}"/>`}
   s+=`</g>`;
   if(route&&route.legs.length){s+=`<g fill="none" stroke-linecap="round">`;
-    for(const l of route.legs){const d=legD(l);const tele=l.kind=="tele";
-      s+=`<path d="${d}" stroke="#1b1208" stroke-width="${8*k}" stroke-opacity="${tele?.35:.7}"/><path class="rline" d="${d}" stroke="${tele?"#b98cff":"var(--route)"}" stroke-width="${4*k}" stroke-dasharray="${l.kind=="fly"?`${14*k} ${4*k}`:`${6*k} ${6*k}`}"/>`}
+    for(const l of route.legs){const d=legD(l);const tele=l.kind=="tele";const dash=l.kind=="fly"?[14*k,4*k]:[6*k,6*k];
+      s+=`<path d="${d}" stroke="#1b1208" stroke-width="${8*k}" stroke-opacity="${tele?.35:.7}"/><path class="rline" d="${d}" stroke="${tele?"#b98cff":"var(--route)"}" stroke-width="${4*k}" stroke-dasharray="${dash.join(" ")}" style="--dash:${-(dash[0]+dash[1])}px;animation-duration:${(dash[0]+dash[1])/k/DASH_PX_S}s"/>`}
     s+=`</g>`}
   // the game's own boat and zeppelin icons at each dock and tower; bigger for the ones this route uses
   {const used=new Set(route?route.legs.filter(l=>l.kind=="ride").map(l=>l.route):[]);
