@@ -42,7 +42,7 @@ A static site, about 7 MB: no server code, no database, no build step needed to 
 | `test/` | the route and UI tests |
 | `brand/` | the favicon and faction logo sources (and the earlier S-curve design) |
 | `data-tools/` | the script and intermediate files used to turn wago.tools exports into flight data (reference) |
-| `LICENSES/OpenMap-MIT.txt` | OpenMap's licence, for the dock, sailing-path and entrance positions |
+| `LICENSES/OpenMap-MIT.txt` | OpenMap's license, for the dock, sailing-path and entrance positions |
 
 ## Hosting
 
@@ -104,4 +104,4 @@ reference.
 - Inspired by Classic Tinker's Flight Master: https://classictinker.com/flight-master/
 - Game data via wago.tools: https://wago.tools
 - Dock, sailing-path and dungeon/raid entrance positions from OpenMap
-  (https://github.com/openmap-world/openmap), MIT licence: see `source/LICENSES/OpenMap-MIT.txt`.
+  (https://github.com/openmap-world/openmap), MIT license: see `source/LICENSES/OpenMap-MIT.txt`.

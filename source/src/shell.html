@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-US">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#16294a">
 <meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
 <meta property="og:site_name" content="Flight Master: Forever">
 <meta property="og:title" content="Flight Master: Forever">
 <meta property="og:description" content="Plan the fastest trip across Azeroth in WoW: Forever: flight paths, boats, zeppelins and teleports on one map.">
@@ -27,7 +28,7 @@
 /* VOICE: a quick travel planner you glance at between quests.
    IDEA: the gryphon master's wall map, with a route card pinned to its corner.
    PICTURE: the whole world map, edge to edge; the route drawn on it in gold.
-   COLOUR and TYPE: parchment map, slate card, gold route; the system UI font throughout (no web fonts).
+   COLOR and TYPE: parchment map, slate card, gold route; the system UI font throughout (no web fonts).
    LAYOUT: map fills the screen, one floating card top-left (a bottom sheet on phones). */
 :root{color-scheme:light dark;--panel:light-dark(rgba(255,252,246,.96),rgba(24,29,35,.95));--ink:light-dark(#1d232a,#eef1f3);--mute:light-dark(#5f6a73,#a4b1bb);--rule:light-dark(#e2ddd1,#34414d);--field:light-dark(#f3efe6,#222a33);--A:#2f6fd1;--H:#c8322b;--B:#efcf96;--Bline:#6e4c1a;--Bbar:#c99a4a;--Btint:light-dark(rgba(243,214,162,.55),rgba(243,214,162,.15));--Btint2:light-dark(rgba(243,214,162,.95),rgba(243,214,162,.28));--Dg:#2f8f3a;--R:#4a4a4a;
   --bA:light-dark(rgba(112,184,232,.6),rgba(112,184,232,.24));--bH:light-dark(rgba(232,116,108,.5),rgba(232,116,108,.24));--bB:light-dark(rgba(243,214,162,.8),rgba(243,214,162,.2));
@@ -293,7 +294,7 @@ body.search .field.to:not(:has(.x:not([hidden])))::after{content:"";position:abs
   -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='8.5' cy='8.5' r='5.5'/%3E%3Cpath d='M13 13l4.5 4.5'/%3E%3C/svg%3E") center/contain no-repeat;
   mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='8.5' cy='8.5' r='5.5'/%3E%3Cpath d='M13 13l4.5 4.5'/%3E%3C/svg%3E") center/contain no-repeat}
 body.search .stop .sugg{left:-52px;right:-102px;top:calc(100% + 12px)}
-/* the faction switch: both crests in a pill, a faction-coloured disc slides behind the chosen one */
+/* the faction switch: both crests in a pill, a faction-colored disc slides behind the chosen one */
 body.search .crests{position:relative;gap:0;padding:3px;border-radius:999px;background:var(--field);border:1px solid var(--rule);margin-left:2px}
 body.search .crests::before{content:"";position:absolute;top:3px;left:3px;width:40px;height:40px;border-radius:50%;background:var(--A);box-shadow:0 1px 4px rgba(0,0,0,.35);transition:transform .22s cubic-bezier(.2,.8,.2,1),background .22s}
 :root[data-fac=H] body.search .crests::before{transform:translateX(40px);background:var(--H)}
@@ -427,7 +428,7 @@ body.search .crests button[aria-pressed=true] img{filter:drop-shadow(0 0 1px #00
       <li>Flights are booked the way the game books them, checked against routes recorded in game: if there's a direct flight to your pick, you fly it; otherwise the game takes the shortest chain of flight paths, and the stops it flies through are listed under the flight. "New flight" means land and talk to the flight master again, when that's quicker.</li>
       <li>Zephras Isle floats in Skywall, the elemental plane of air, so Blizzard gives it no spot on the world map. It's drawn at true scale in the open sky north of the Maelstrom, from its own explored map, with the skyships from the Valanaar Skydocks to Dalaran (Alterac Mountains) and Skywatcher Plateau (Mulgore).</li>
       <li>Fares are the base prices from the game's flight tables. Reputation discounts aren't applied: at Honored or above with a flight master's faction you pay less in game (Honored takes 10% off, so 6s 30c becomes 5s 67c).</li>
-      <li>Boat and zeppelin routes, docks and sailing paths come from the game's tables as compiled by the <a href="https://github.com/openmap-world/openmap">OpenMap</a> addon (MIT licence), as do the dungeon and raid entrances; the explored Zul'Gurub corner of Stranglethorn Vale uses the Classic Era client's overlay, because Forever's files don't include one yet; the open-sea stretches are routed around the land. Routes to a dungeon or raid end with a ride from the nearest flight point to its entrance. The new Menethil boat runs one way: Menethil → Southshore → Auberdine → Menethil.</li>
+      <li>Boat and zeppelin routes, docks and sailing paths come from the game's tables as compiled by the <a href="https://github.com/openmap-world/openmap">OpenMap</a> addon (MIT license), as do the dungeon and raid entrances; the explored Zul'Gurub corner of Stranglethorn Vale uses the Classic Era client's overlay, because Forever's files don't include one yet; the open-sea stretches are routed around the land. Routes to a dungeon or raid end with a ride from the nearest flight point to its entrance. The new Menethil boat runs one way: Menethil → Southshore → Auberdine → Menethil.</li>
       <li>Inn towns without a flight master (Goldshire, Kharanos, Dolanaar, Razor Hill, Bloodhoof Village, Brill) are placed from their in-game map coordinates, and the run from them to the nearest flight master is estimated.</li>
       <li>Level ranges are Classic's, except the announced ones for the new zones (Riverglades 35–45, Shen'dralas 40–45, Mount Hyjal 60). Shen'dralas has no flight master yet; Powderfuse Port's are in the files but not active.</li>
       <li>The detailed map is built from every zone's fully discovered in-game map.</li>
@@ -438,8 +439,8 @@ body.search .crests button[aria-pressed=true] img{filter:drop-shadow(0 0 1px #00
       <li>World of Warcraft, Warcraft and Blizzard Entertainment are trademarks or registered trademarks of Blizzard Entertainment, Inc., in the U.S. and/or other countries. Map art, icons and faction crests © Blizzard Entertainment, Inc.</li>
       <li>Inspired by <a href="https://classictinker.com/flight-master/">Classic Tinker's Flight Master</a>, whose route planner and layout this follows.</li>
       <li>Game data read from the WoW: Forever client files via <a href="https://wago.tools">wago.tools</a>.</li>
-      <li>Boat, zeppelin and skyship docks and sailing paths, and dungeon and raid entrance positions, come from <a href="https://github.com/openmap-world/openmap">OpenMap</a>, used under the MIT licence:
-        <details class="mitlic"><summary>OpenMap licence (MIT)</summary><pre>MIT License
+      <li>Boat, zeppelin and skyship docks and sailing paths, and dungeon and raid entrance positions, come from <a href="https://github.com/openmap-world/openmap">OpenMap</a>, used under the MIT license:
+        <details class="mitlic"><summary>OpenMap license (MIT)</summary><pre>MIT License
 
 Copyright (c) 2026 OpenMap contributors
 

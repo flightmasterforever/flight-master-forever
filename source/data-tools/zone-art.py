@@ -3,7 +3,7 @@
 The detailed zone art (docs/hires3) is one picture per continent at about 3.5 pixels per map unit, so small zones
 (Searing Gorge is 150 units wide) are squeezed to half the detail the game's own zone maps have, and their place
 names end up a few pixels tall. This rebuilds each zone's map the way the game draws it (base tiles plus the
-explored-area overlays), colour-matches it to hires3, keeps only the part hires3 takes from that zone (neighbouring
+explored-area overlays), color-matches it to hires3, keeps only the part hires3 takes from that zone (neighboring
 zones and the parchment frame are cut away with a soft edge), and writes it out at the game's full 1002x668.
 The app draws these over hires3 only when zoomed in past what hires3 can show.
 
@@ -58,8 +58,8 @@ def continent(pre):
     return np.asarray(c).astype(np.float32), x0, y0
 cont = {"k": continent("k"), "e": continent("e")}
 
-def fit_colour(src, dst, keep):
-    """least-squares 3x3 + bias colour map from src to dst on the kept pixels, refitted on the best-matching 60%"""
+def fit_color(src, dst, keep):
+    """least-squares 3x3 + bias color map from src to dst on the kept pixels, refitted on the best-matching 60%"""
     X = np.c_[src[keep], np.ones(keep.sum())]; Y = dst[keep]
     for _ in range(3):
         M = np.linalg.lstsq(X, Y, rcond=None)[0]; err = np.abs(X @ M - Y).mean(1)
@@ -97,7 +97,7 @@ def fill_holes(m):
     ImageDraw.floodfill(pad, (0, 0), 128)
     return pad.crop((1, 1, m.width + 1, m.height + 1)).point(lambda v: 0 if v == 128 else 255)
 
-# every zone's map, colour-matched to hires3, and how far it is from hires3 at each hires3 pixel
+# every zone's map, color-matched to hires3, and how far it is from hires3 at each hires3 pixel
 info = {}
 for z in zones:
     name, (x, y, w, h) = z[0], z[2:6]
@@ -109,9 +109,9 @@ for z in zones:
     if cache.exists(): full = np.load(cache)
     else: full = zone_map(name); np.save(cache, full)
     sm = np.asarray(Image.fromarray(full.astype(np.uint8)).resize((W, Hh), Image.LANCZOS)).astype(np.float32)
-    M = fit_colour(sm, hr[..., :3], hr[..., 3] > 250)
+    M = fit_color(sm, hr[..., :3], hr[..., 3] > 250)
     err = np.abs((np.c_[sm.reshape(-1, 3), np.ones(W * Hh)] @ M).reshape(Hh, W, 3) - hr[..., :3]).mean(2)
-    # fine detail (lettering, icons, outlines) that hires3 shows here but this zone's map doesn't: a neighbour's label
+    # fine detail (lettering, icons, outlines) that hires3 shows here but this zone's map doesn't: a neighbor's label
     # near the border must not be painted over
     hp = lambda a: a.mean(2) - fblur(a.mean(2), 1.5)
     fit = (np.c_[sm.reshape(-1, 3), np.ones(W * Hh)] @ M).reshape(Hh, W, 3)
@@ -122,7 +122,7 @@ out = []; (docs / "zones").mkdir(exist_ok=True)
 for name, d in info.items():
     x, y, w, h = d["z"][2:6]
     if ZW / w < P * GAIN: continue
-    # this zone owns a pixel where its map explains hires3 (colour plus fine detail such as lettering) at least as well as any neighbouring zone's map does
+    # this zone owns a pixel where its map explains hires3 (color plus fine detail such as lettering) at least as well as any neighboring zone's map does
     best_other = np.full(d["err"].shape, 255, np.float32)
     for o, e in info.items():
         if o == name or e["H"] is not d["H"]: continue
@@ -134,9 +134,9 @@ for name, d in info.items():
     own = (d["err"] <= best_other + 1.5) & (d["err"] < 40) & (d["hf"] < HF) & d["land"]
     m = Image.fromarray((own * 255).astype(np.uint8))
     m = m.filter(ImageFilter.MinFilter(7)).filter(ImageFilter.MaxFilter(15)).filter(ImageFilter.MinFilter(9))  # drop specks, close gaps
-    m = fill_holes(big_parts(m))  # a stray piece of a neighbouring zone that happens to match is dropped
+    m = fill_holes(big_parts(m))  # a stray piece of a neighboring zone that happens to match is dropped
     m = m.resize((ZW, ZH), Image.BILINEAR).filter(ImageFilter.MinFilter(9)).filter(ImageFilter.GaussianBlur(5))  # soft edge, kept inside
-    # hires3 stays exactly as it is at its own size (all its colour and contrast); the zone map only adds the detail
+    # hires3 stays exactly as it is at its own size (all its color and contrast); the zone map only adds the detail
     # finer than hires3 can hold: its full-size picture minus itself blurred down to hires3's size
     W, Hh = d["W"], d["Hh"]
     up = lambda a: np.stack([np.asarray(Image.fromarray(a[..., c].astype(np.float32), "F").resize((ZW, ZH), Image.BICUBIC)) for c in range(3)], -1)
