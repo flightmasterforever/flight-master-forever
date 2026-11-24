@@ -26,6 +26,7 @@ zones = json.loads(re.search(r'"zones":(\[\[.*?\]\])', g).group(1))
 hires = json.loads(re.search(r'"hires3":(\[\[.*?\]\])', g).group(1))
 P = 1024 / 292.57          # hires3 pixels per map unit
 ZW, ZH = 1002, 668         # the game's zone map size
+HF = 22                    # fine-detail mismatch (hires3 vs a zone's map) above which a pixel is never taken
 GAIN = 1.15                # only zones whose own map has at least this much more detail than hires3
 
 rd = lambda t: list(csv.DictReader(open(work / "db" / f"{t}.csv", encoding="utf-8")))
@@ -68,6 +69,28 @@ def fit_colour(src, dst, keep):
 def blur(a, r):
     return np.asarray(Image.fromarray(np.clip(a, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(r))).astype(np.float32)
 
+def fblur(a, sigma):
+    """gaussian blur of a float image (any channels), edges extended"""
+    r = int(3 * sigma) + 1; k = np.exp(-0.5 * (np.arange(-r, r + 1) / sigma) ** 2); k /= k.sum()
+    for ax in (0, 1):
+        pad = [(0, 0)] * a.ndim; pad[ax] = (r, r); b = np.pad(a, pad, mode="edge")
+        a = sum(k[i] * np.take(b, range(i, i + a.shape[ax]), axis=ax) for i in range(2 * r + 1))
+    return a
+
+def big_parts(m, keep=0.25):
+    """the largest connected piece of a mask, plus any piece at least `keep` of its size"""
+    a = np.asarray(m) > 127; lab = np.zeros(a.shape, np.int32); sizes = [0]
+    for y0, x0 in zip(*np.nonzero(a)):
+        if lab[y0, x0]: continue
+        n = len(sizes); sizes.append(0); st = [(y0, x0)]; lab[y0, x0] = n
+        while st:
+            y, x = st.pop(); sizes[n] += 1
+            for yy, xx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                if 0 <= yy < a.shape[0] and 0 <= xx < a.shape[1] and a[yy, xx] and not lab[yy, xx]: lab[yy, xx] = n; st.append((yy, xx))
+    if len(sizes) == 1: return m
+    big = max(sizes); ok = [i for i, sz in enumerate(sizes) if i and sz >= keep * big]
+    return Image.fromarray((np.isin(lab, ok) * 255).astype(np.uint8))
+
 def fill_holes(m):
     """a mask with every enclosed hole filled (flood the outside from the border)"""
     pad = Image.new("L", (m.width + 2, m.height + 2), 0); pad.paste(m, (1, 1))
@@ -82,17 +105,24 @@ for z in zones:
     H, x0, y0 = cont["k" if x < 1500 else "e"]
     X, Y = round((x - x0) * P), round((y - y0) * P)
     hr = H[Y:Y + round(h * P), X:X + round(w * P)]; Hh, W = hr.shape[:2]
-    full = zone_map(name)
+    cache = work / "cache" / f"{name}.npy"; cache.parent.mkdir(exist_ok=True)
+    if cache.exists(): full = np.load(cache)
+    else: full = zone_map(name); np.save(cache, full)
     sm = np.asarray(Image.fromarray(full.astype(np.uint8)).resize((W, Hh), Image.LANCZOS)).astype(np.float32)
     M = fit_colour(sm, hr[..., :3], hr[..., 3] > 250)
     err = np.abs((np.c_[sm.reshape(-1, 3), np.ones(W * Hh)] @ M).reshape(Hh, W, 3) - hr[..., :3]).mean(2)
-    info[name] = dict(z=z, X=X, Y=Y, W=W, Hh=Hh, H=H, M=M, full=full, err=blur(err, 6), land=hr[..., 3] > 250)
+    # fine detail (lettering, icons, outlines) that hires3 shows here but this zone's map doesn't: a neighbour's label
+    # near the border must not be painted over
+    hp = lambda a: a.mean(2) - fblur(a.mean(2), 1.5)
+    fit = (np.c_[sm.reshape(-1, 3), np.ones(W * Hh)] @ M).reshape(Hh, W, 3)
+    hf = fblur(np.abs(hp(hr[..., :3]) - hp(fit)), 4)
+    info[name] = dict(z=z, X=X, Y=Y, W=W, Hh=Hh, H=H, M=M, full=full, err=blur(err, 6) + 1.5 * hf, hf=hf, land=hr[..., 3] > 250, hr=hr, sm=sm)
 
 out = []; (docs / "zones").mkdir(exist_ok=True)
 for name, d in info.items():
     x, y, w, h = d["z"][2:6]
     if ZW / w < P * GAIN: continue
-    # this zone owns a pixel where its map matches hires3 at least as well as any neighbouring zone's map does
+    # this zone owns a pixel where its map explains hires3 (colour plus fine detail such as lettering) at least as well as any neighbouring zone's map does
     best_other = np.full(d["err"].shape, 255, np.float32)
     for o, e in info.items():
         if o == name or e["H"] is not d["H"]: continue
@@ -101,13 +131,22 @@ for name, d in info.items():
         sub = e["err"][ay - e["Y"]:by - e["Y"], ax - e["X"]:bx - e["X"]]
         reg = best_other[ay - d["Y"]:by - d["Y"], ax - d["X"]:bx - d["X"]]
         np.minimum(reg, sub, out=reg)
-    own = (d["err"] <= best_other + 1.5) & (d["err"] < 28) & d["land"]
+    own = (d["err"] <= best_other + 1.5) & (d["err"] < 40) & (d["hf"] < HF) & d["land"]
     m = Image.fromarray((own * 255).astype(np.uint8))
     m = m.filter(ImageFilter.MinFilter(7)).filter(ImageFilter.MaxFilter(15)).filter(ImageFilter.MinFilter(9))  # drop specks, close gaps
-    m = fill_holes(m)
+    m = fill_holes(big_parts(m))  # a stray piece of a neighbouring zone that happens to match is dropped
     m = m.resize((ZW, ZH), Image.BILINEAR).filter(ImageFilter.MinFilter(9)).filter(ImageFilter.GaussianBlur(5))  # soft edge, kept inside
-    rgb = np.c_[d["full"].reshape(-1, 3), np.ones(ZW * ZH)] @ d["M"]
-    img = Image.fromarray(np.clip(rgb, 0, 255).astype(np.uint8).reshape(ZH, ZW, 3)).convert("RGBA"); img.putalpha(m)
+    # hires3 stays exactly as it is at its own size (all its colour and contrast); the zone map only adds the detail
+    # finer than hires3 can hold: its full-size picture minus itself blurred down to hires3's size
+    W, Hh = d["W"], d["Hh"]
+    up = lambda a: np.stack([np.asarray(Image.fromarray(a[..., c].astype(np.float32), "F").resize((ZW, ZH), Image.BICUBIC)) for c in range(3)], -1)
+    fit = (np.c_[d["full"].reshape(-1, 3), np.ones(ZW * ZH)] @ d["M"]).reshape(ZH, ZW, 3)
+    down = np.stack([np.asarray(Image.fromarray(fit[..., c].astype(np.float32), "F").resize((W, Hh), Image.LANCZOS)) for c in range(3)], -1)
+    rgb = up(d["hr"][..., :3]) + (fit - up(down))
+    # where hires3 itself is see-through (a few cut-outs), the map below shows there; leave those alone too
+    ha = Image.fromarray(d["hr"][..., 3].astype(np.uint8)).resize((ZW, ZH), Image.BILINEAR).filter(ImageFilter.MinFilter(5))
+    m = Image.fromarray((np.asarray(m, np.float32) * np.asarray(ha, np.float32) / 255).astype(np.uint8))
+    img = Image.fromarray(np.clip(rgb, 0, 255).astype(np.uint8)).convert("RGBA"); img.putalpha(m)
     bb = m.point(lambda v: 255 if v > 8 else 0).getbbox()
     if not bb: continue
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower().replace("'", "")).strip("-")
