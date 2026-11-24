@@ -377,7 +377,7 @@ function renderRoutes(){const box=$("routes");
       s.kind=="fly"?`Fly to ${nz(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}</li>`).join("")}</ul>`:""}${one?"":`<div class="t">${fmtT(s.t)}${s.rebook?" · new flight":""}</div>`}`:
       s.kind=="ride"?`${s.label} to ${nz(s.b)}<div class="t">5 min${s.route==LOOP?" · one-way loop":""}</div>`:
       s.kind=="tele"?(s.label==TRANSPONDER?`Teleporter to ${nz(s.b)}<div class="t">&lt;1 min</div>`:`${esc(s.label)}${s.label=="Hearthstone"?` to ${nz(s.b)}`:""}<div class="t">10 sec cast</div>`):
-      `${s.label=="portal"?"Take the portal":"Ride"} to ${nz(s.b)}<div class="t">${fmtT(s.t)}</div>`}</div></li>${s.stopEnd?`<li class="stopmark"><span class="smk"></span><div>Stop at ${nz(s.b)}</div></li>`:""}`).join("")}</ol>`:"";
+      `${s.label=="portal"?"Take the portal":"Run"} to ${nz(s.b)}<div class="t">${fmtT(s.t)}</div>`}</div></li>${s.stopEnd?`<li class="stopmark"><span class="smk"></span><div>Stop at ${nz(s.b)}</div></li>`:""}`).join("")}</ol>`:"";
     return `<div class="rcard" data-r="${i}" ${i==ri?'aria-current="true"':'role="button" tabindex="0"'}>${sum}${list}</div>`}).join("");
   box.querySelectorAll('.rcard[data-r]').forEach(el=>{const go=()=>{const i=+el.dataset.r;if(i!=ri){ri=i;renderRoutes();fitRoute();draw()}};el.onclick=go;el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();go()}}})}
 
