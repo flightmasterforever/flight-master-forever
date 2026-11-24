@@ -230,7 +230,8 @@ i.fB{background:var(--B)!important;box-shadow:inset 0 0 0 1.5px var(--Bline)}
 .sheet table{width:100%;border-collapse:collapse;font-size:15px}.sheet td,.sheet th{text-align:left;padding:6px;border-bottom:1px solid var(--rule);vertical-align:top}.sheet th{color:var(--mute);font-weight:500}
 .sheet li{margin:5px 0}.sheet a{color:inherit}
 :focus-visible{outline:3px solid var(--route);outline-offset:2px}
-@keyframes dash{to{stroke-dashoffset:-24}}.rline{animation:dash 1s linear infinite}
+/* each route line moves back one whole dash pattern per loop (--dash, set with its duration in app.js), so the speed on screen is the same at every zoom */
+@keyframes dash{to{stroke-dashoffset:var(--dash)}}.rline{animation:dash 1s linear infinite}
 @media(prefers-reduced-motion:reduce){.rline{animation:none}}
 @media(max-width:700px){
   .card{top:auto;bottom:0;left:0;right:0;width:auto;max-height:58%;border-radius:16px 16px 0 0}
