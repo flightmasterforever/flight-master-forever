@@ -101,6 +101,12 @@ try{fac=localStorage.getItem("fmf-fac")||"A";const c=JSON.parse(localStorage.get
 const save=()=>{try{localStorage.setItem("fmf-fac",fac);localStorage.setItem("fmf-char",JSON.stringify(ch))}catch(e){}};
 let from=null,to=null,routes=[],ri=0,popId=null;
 let vias=[];/* stops on the way, in order (null: a stop row not filled in yet) */
+// flight points the player said they don't have, for this trip only ("Don't have this?" in the directions).
+// They're cleared when the trip changes. You still learn a flight point by talking to its flight master, so the place
+// you start from always counts as learned, and a destination you don't have is reached on foot from a nearby one
+let avoid=new Set(),avoidKey="";
+const tripKey=()=>[from,to,...vias].filter(v=>v!=null).sort((a,b)=>a-b).join(",");
+const noFrom=s=>{if(!s||!s.size)return null;const r=new Set(s);r.delete(from);return r.size?r:null};
 // Nighthaven's flight master is druid-only, but anyone can go there: it is shown and routed to (on foot from Moonglade) when picked
 const vis=id=>{const o=N[id];return !!o&&o.f.has(fac)&&(!o.druid||ch.druid||o.id==from||o.id==to)};
 const fly=id=>vis(id)&&(!N[id].druid||ch.druid);
@@ -296,11 +302,11 @@ function draw(){
 }
 
 // ---- routing ----
-function graph(opt){const g={};const add=(a,b,c,kind,label,cost,extra)=>{if(opt.ban&&opt.ban.has(a+">"+b))return;(g[a]||(g[a]=[])).push({b,c:opt.cheap?(cost||0)*10000+c:c,kind,label,cost,...extra})};
+function graph(opt){const g={},ex=noFrom(opt.ex);const add=(a,b,c,kind,label,cost,extra)=>{if(opt.ban&&opt.ban.has(a+">"+b))return;(g[a]||(g[a]=[])).push({b,c:opt.cheap?(cost||0)*10000+c:c,kind,label,cost,...extra})};
   // whole flights, booked the way the game books them (confirmed against routes recorded in game):
   // a direct flight if one exists, otherwise the shortest chain by flight-path length.
   // Landing and booking again is a separate step, so the planner can still choose it when that's faster.
-  for(const f of flights(opt.ex))add(f.a,f.b,f.t+8,"fly","",f.cost,{t:f.t+8,via:f.via})/* the 8 sec covers taking off, landing and booking */
+  for(const f of flights(ex))add(f.a,f.b,f.t+8,"fly","",f.cost,{t:f.t+8,via:f.via})/* the 8 sec covers taking off, landing and booking */
   // a dock tied to one faction's flight master in a shared town (Booty Bay) is used from this faction's flight master there
   const rv=id=>{if(vis(id))return id;const o=N[id];if(!NEUT.has(o.name))return null;const s=Object.values(N).find(n=>n.name==o.name&&vis(n.id));return s?s.id:null};
   if(opt.ride)for(const t of TR)if(tUse(t)){const a=rv(t[3]),b=rv(t[4]);if(a==null||b==null)continue;const tt=300;/* the tram counts the walk from each flight master and the wait too, like the boats: about 5 min door to door */add(a,b,tt,"ride",t[0],0,{route:t[1],t:tt})}
@@ -311,6 +317,8 @@ function graph(opt){const g={};const add=(a,b,c,kind,label,cost,extra)=>{if(opt.
   if(opt.tele&&ch.mage>=50&&from!=DALARAN)hubs.map(h=>[h,dist(DALARAN,h.id)]).sort((a,b)=>a[1]-b[1]).slice(0,2).forEach(([h])=>{const c=dist(DALARAN,h.id)*YPU/9;add(DALARAN,h.id,c,"walk","",0,{t:c})});
   // an entrance is only ever the start or the end of a route, reached from its two nearest travel points
   for(const o of Object.values(N))if(o.inst&&(o.id==from||o.id==to))hubs.map(h=>[h,dist(o.id,h.id)]).sort((a,b)=>a[1]-b[1]).slice(0,2).forEach(([h])=>{const c=dist(o.id,h.id)*YPU/9;o.id==to?add(h.id,o.id,c,"walk","",0,{t:c}):add(o.id,h.id,c,"walk","",0,{t:c})});
+  // a destination whose flight point you don't have: fly to one of the two nearest you do have and run the rest
+  if(ex&&ex.has(to)&&N[to].fp)hubs.filter(h=>h.id!=to&&!ex.has(h.id)&&LAND[h.id]==LAND[to]).map(h=>[h,dist(to,h.id)]).sort((a,b)=>a[1]-b[1]).slice(0,2).forEach(([h])=>{const c=dist(to,h.id)*YPU/9;add(h.id,to,c,"walk","",0,{t:c})});
   {const nh=Object.values(N).find(o=>o.druid&&o.f.has(fac)),mg=findNode("Moonglade",fac);if(nh&&mg)walk(nh.id,mg.id,20)}
   // Horde with the Goblin Transponder: Scooty's two-way teleporter, Booty Bay <-> the Gnomeregan entrance
   if(fac=="H"&&ch.gnome){const bb=findNode("Booty Bay","H");if(bb){add(bb.id,GNOMER,20,"tele",TRANSPONDER,0,{t:20});add(GNOMER,bb.id,20,"tele",TRANSPONDER,0,{t:20})}}
@@ -323,6 +331,21 @@ function graph(opt){const g={};const add=(a,b,c,kind,label,cost,extra)=>{if(opt.
     if(ch.gadget){const n=findNode("Gadgetzan",fac);if(n)T(n.id,"Ultrasafe Transporter: Gadgetzan")}
     if(ch.ever){const n=findNode("Everlook",fac);if(n)T(n.id,"Dimensional Ripper - Everlook")}}
   return g}
+// when leaving out a flight point cuts the destination off from the flight network (no flight point you have flies
+// there any more), run in from the two nearest places you can still reach. Only used when there's no other way
+// Every place you can't get to any more is joined, on foot, to the nearest place you can (a flight point you don't have
+// counts too, since its boat or zeppelin may be the way on), and the fastest of those is taken.
+// You only ever run on the same landmass: LAND groups places joined by flight paths or on foot, so never across the sea
+// (a pier with nothing else around it, like the Feralas coast ferry, belongs to the land its boat sails to)
+const LAND={};{const up=x=>LAND[x]==null||LAND[x]==x?(LAND[x]=x):(LAND[x]=up(LAND[x]));for(const [a,b] of [...G.edges,...G.walks,...G.towns])LAND[up(a)]=up(b);for(const id in N)up(+id);
+  const size={};for(const id in N)size[up(+id)]=(size[up(+id)]||0)+1;for(const t of TR)for(const [a,b] of [[t[3],t[4]],[t[4],t[3]]])if(size[up(a)]==1&&size[up(b)]>1)LAND[up(a)]=up(b);for(const id in N)up(+id)}
+function runIn(g,ex){const seen=new Set([from]),q=[from];while(q.length){const u=q.pop();for(const e of g[u]||[])if(!seen.has(e.b)){seen.add(e.b);q.push(e.b)}}
+  const hubs=Object.values(N).filter(o=>!o.inst&&fly(o.id)&&!ex.has(o.id)&&seen.has(o.id));
+  for(const o of Object.values(N)){if(seen.has(o.id)||(o.inst&&o.id!=to)||!vis(o.id))continue;
+    let h=null,hd=1/0;for(const s of hubs)if(LAND[s.id]==LAND[o.id]){const d=dist(s.id,o.id);if(d<hd){hd=d;h=s.id}}
+    if(h!=null){const c=hd*YPU/9;(g[h]||(g[h]=[])).push({b:o.id,c,kind:"walk",label:"",cost:0,t:c})}}}
+const route=o=>{const g=graph(o);let r=dijkstra(g);const ex=noFrom(o.ex);
+  if(!r&&ex){runIn(g,ex);r=dijkstra(g)}return r};
 function dijkstra(g){const d={[from]:0},prev={},done=new Set();
   while(true){let u=null;for(const n in d)if(!done.has(n)&&(u==null||d[n]<d[u]))u=n;if(u==null||+u==to)break;done.add(u);
     for(const e of g[u]||[]){const nd=d[u]+e.c;if(d[e.b]==null||nd<d[e.b]){d[e.b]=nd;prev[e.b]={u:+u,e}}}}
@@ -333,7 +356,7 @@ function dijkstra(g){const d={[from]:0},prev={},done=new Set();
 // used at most once a trip (they have cooldowns); Scooty's teleporter can be used any time
 function solveChain(all){const pts=all.filter((p,i)=>i==0||p!=all[i-1]);if(pts.length<2)return;
   const f0=from,t0=to,used=new Set(),legs=[],nodes=[pts[0]];let ok=true;
-  for(let i=0;i<pts.length-1;i++){from=pts[i];to=pts[i+1];const r=dijkstra(graph({tele:1,ride:1,used}));if(!r){ok=false;break}
+  for(let i=0;i<pts.length-1;i++){from=pts[i];to=pts[i+1];const r=route({tele:1,ride:1,used,ex:avoid});if(!r){ok=false;break}
     r.legs.forEach(l=>{if(l.kind=="tele"&&l.label!=TRANSPONDER)used.add(l.label)});
     if(i<pts.length-2&&r.legs.length)r.legs[r.legs.length-1].stopEnd=1;
     legs.push(...r.legs);nodes.push(...r.nodes.slice(1))}
@@ -342,7 +365,7 @@ function solveChain(all){const pts=all.filter((p,i)=>i==0||p!=all[i-1]);if(pts.l
 function solve(){routes=[];ri=0;const vs=vias.filter(v=>v!=null);if(vs.length&&from!=null&&to!=null){solveChain([from,...vs,to]);return}
   if(from==null||to==null||from==to)return;
   const cands=[];const sig=r=>r.legs.map(l=>l.kind[0]+[l.a,...(l.via||[]),l.b].join(">")).join("|");
-  const tryOpt=o=>{const r=dijkstra(graph(o));if(r)cands.push(r)};
+  const AV=avoid.size?avoid:null,tryOpt=o=>{const r=route({...o,ex:AV});if(r){if(AV)r.ex=noFrom(AV);cands.push(r)}};
   tryOpt({tele:1,ride:1});tryOpt({tele:0,ride:1});tryOpt({tele:1,ride:0});tryOpt({tele:0,ride:0});
   if(cands[0])for(const l of cands[0].legs.slice(0,3))tryOpt({tele:1,ride:1,ban:new Set([l.a+">"+l.b])});
   cands.sort((a,b)=>Math.abs(a.total-b.total)<=1?a.fare-b.fare:a.total-b.total);
@@ -350,11 +373,11 @@ function solve(){routes=[];ri=0;const vs=vias.filter(v=>v!=null);if(vs.length&&f
   // then the best route for a character missing a flight path the fastest one relies on (stops and landings along
   // the way, not where you start or end), one each, in the order you'd reach them
   if(best){const need=[];for(const l of best.legs)if(l.kind=="fly")for(const id of [...(l.via||[]),l.b])if(id!=from&&id!=to&&N[id].fp&&!CAPITAL.has(id)&&!need.includes(id))need.push(id);
-    for(const id of need){if(routes.length>=3)break;const ex=new Set([id]),r=dijkstra(graph({tele:1,ride:1,ex}));
-      if(r&&!routes.some(p=>sig(p)==sig(r))){r.ex=ex;r.why=`If you don't have ${N[id].name}`;routes.push(r)}}}
+    for(const id of need){if(routes.length>=3)break;const ex=new Set([...avoid,id]),r=dijkstra(graph({tele:1,ride:1,ex}));
+      if(r&&!routes.some(p=>sig(p)==sig(r))){r.ex=noFrom(ex);r.why=`If you don't have ${N[id].name}`;routes.push(r)}}}
   // and the plain booking, the one the game makes if you just pick the destination, if there's room
-  const one=fly(from)&&fly(to)&&flights().find(f=>f.a==from&&f.b==to);
-  const plain=one&&{nodes:[from,...one.via,to],legs:[{a:from,b:to,kind:"fly",label:"",cost:one.cost,t:one.t+8,via:one.via}],total:one.t+8,fare:one.cost};
+  const one=fly(from)&&fly(to)&&flights(noFrom(avoid)||undefined).find(f=>f.a==from&&f.b==to);
+  const plain=one&&{nodes:[from,...one.via,to],legs:[{a:from,b:to,kind:"fly",label:"",cost:one.cost,t:one.t+8,via:one.via}],total:one.t+8,fare:one.cost,ex:noFrom(avoid)};
   if(plain&&routes.length<3&&!routes.some(p=>sig(p)==sig(plain)))routes.push(plain);
   if(!routes.length)routes=[{none:1,nodes:[],legs:[]}]}
 // each flight leg is one booking with the stops the game will fly; a booking right after another means landing first
@@ -364,7 +387,13 @@ function steps(r){return r.legs.map((l,i)=>({...l,via:l.via||[],rebook:l.kind=="
 function renderRoutes(){const box=$("routes");
   if(from==null||to==null){box.innerHTML=`<p class="empty">${from==null?"Choose where you're starting, or "+(phone.matches?"tap":"click")+" a flight point on the map.":"Now choose a destination."}</p>`;return}
   if(!routes.length){box.innerHTML=`<p class="empty">You're already there.</p>`;return}
-  if(routes[0].none){box.innerHTML=`<p class="empty">No route found between these two.</p>`;return}
+  // flight points left out of this trip, each with a ✕ to put it back
+  const chips=avoid.size?`<div class="avoid" role="group" aria-label="Flight points left out of this trip"><span class="avl">Avoiding:</span>${[...avoid].map(id=>`<button class="chip" data-un="${id}" aria-label="Stop avoiding ${esc(N[id].name)}"><span>${esc(N[id].name)}</span><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>`).join("")}</div>`:"";
+  const wire=()=>{box.querySelectorAll("[data-no],[data-un]").forEach(b=>b.onclick=e=>{e.stopPropagation();const id=+(b.dataset.no??b.dataset.un);
+      if(b.dataset.no!=null)avoid.add(id);else avoid.delete(id);update(true);
+      // keep the keyboard where it was: on the new chip, or back on the panel after one is removed
+      const f=b.dataset.no!=null?box.querySelector(`[data-un="${id}"]`):box.querySelector("[data-un]")||box.querySelector("[data-no]");if(f)f.focus({preventScroll:true})})};
+  if(routes[0].none){box.innerHTML=chips+`<p class="empty">No route found between these two${avoid.size?" without "+[...avoid].map(id=>esc(N[id].name)).join(", "):""}.</p>`;wire();return}
   const nm=id=>esc(N[id].name);
   // a destination with its zone, as the game names it: "Booty Bay, Stranglethorn"
   const nz=id=>{const o=N[id];return `<b>${esc(o.name)}</b>${o.zone&&o.zone!=o.name?`<span class="dz">, ${esc(o.zone)}</span>`:""}`};
@@ -378,12 +407,15 @@ function renderRoutes(){const box=$("routes");
     const name=r.stops?`Stops at ${r.stops.map(nm).join(", ")}`:mid.length?`via ${mid.slice(0,2).join(", ")}${mid.length>2?"…":""}`:main.kind=="fly"?(main.via&&main.via.length?`One flight, ${main.via.length} stop${main.via.length>1?"s":""}`:"Direct flight"):esc(main.label=="portal"?"Portal":main.label||"Ride");
     const sum=`<div class="rhead"><span class="rmode">${icon(main)}</span><div class="rt"><div class="rname">${name}</div>${why[i]?`<div class="rwhy">${why[i]}</div>`:""}</div><div class="rnum"><b>${fmtTot(r.total)}</b>${r.fare?`<small>${money(r.fare)}</small>`:routes.some(o=>o.fare)?`<small>Free</small>`:""}</div></div>`;
     const one=st.length==1;
-    const list=i==ri&&!(one&&!(st[0].via||[]).length)?`<ol class="steps">${st.map((s,k)=>`<li${s.via&&s.via.length?' class="via"':""}><span class="num">${k+1}</span><div><span class="sic">${icon(s)}</span>${
-      s.kind=="fly"?`Fly to ${nz(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}</li>`).join("")}</ul>`:""}${one?"":`<div class="t">${fmtT(s.t)}${s.rebook?" · new flight":""}</div>`}`:
+    // "Don't have this?" on each flight point the trip flies to or through (not the start: you learn it there)
+    const no=id=>id!=from&&N[id].fp&&!avoid.has(id)?`<button class="nofp" data-no="${id}" aria-label="I don't have ${esc(N[id].name)}">Don't have this?</button>`:"";
+    const list=i==ri&&!(one&&!(st[0].via||[]).length&&!(st[0].kind=="fly"&&no(st[0].b)))?`<ol class="steps">${st.map((s,k)=>`<li${s.via&&s.via.length?' class="via"':""}><span class="num">${k+1}</span><div><span class="sic">${icon(s)}</span>${
+      s.kind=="fly"?`Fly to ${nz(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}${no(v)}</li>`).join("")}</ul>`:""}${one&&!no(s.b)?"":`<div class="t">${[one?"":fmtT(s.t)+(s.rebook?" · new flight":""),no(s.b)].filter(Boolean).join(" · ")}</div>`}`:
       s.kind=="ride"?`${s.label} to ${nz(s.b)}<div class="t">5 min${s.route==LOOP?" · one-way loop":""}</div>`:
       s.kind=="tele"?(s.label==TRANSPONDER?`Teleporter to ${nz(s.b)}<div class="t">&lt;1 min</div>`:`${esc(s.label)}${s.label=="Hearthstone"?` to ${nz(s.b)}`:""}<div class="t">10 sec cast</div>`):
       `${s.label=="portal"?"Take the portal":"Run"} to ${nz(s.b)}<div class="t">${fmtT(s.t)}</div>`}</div></li>${s.stopEnd?`<li class="stopmark"><span class="smk"></span><div>Stop at ${nz(s.b)}</div></li>`:""}`).join("")}</ol>`:"";
     return `<div class="rcard" data-r="${i}" ${i==ri?'aria-current="true"':'role="button" tabindex="0"'}>${sum}${list}</div>`}).join("");
+  if(chips)box.insertAdjacentHTML("afterbegin",chips);wire();
   box.querySelectorAll('.rcard[data-r]').forEach(el=>{const go=()=>{const i=+el.dataset.r;if(i!=ri){ri=i;renderRoutes();fitRoute();draw()}};el.onclick=go;el.onkeydown=e=>{if(e.key=="Enter"||e.key==" "){e.preventDefault();go()}}})}
 
 function charSummary(){const hs=ch.hearth[fac],p=[];if(hs!=null&&N[hs]&&N[hs].f.has(fac))p.push("Hearth: "+N[hs].name);
@@ -503,7 +535,7 @@ function renderStatic(){
   $("legend").innerHTML=`<span><i style="background:var(--${fac})"></i>${fac=="A"?"Alliance":"Horde"}</span><span><i class="fB"></i>Both factions</span><span><img class="lic" src="icons/dungeon.png" alt="">Dungeon</span><span><img class="lic" src="icons/raid.png" alt="">Raid</span><span><svg class="lnew" width="30" height="12" viewBox="0 0 30 12" aria-hidden="true"><line x1="1" y1="6" x2="21" y2="6" stroke="var(--new)" stroke-width="2.4" stroke-linecap="round"/><circle cx="23" cy="6" r="4.2" fill="#3a2a12" stroke="var(--new)" stroke-width="2"/></svg>New in Forever</span><span><img class="lic" src="icons/boat-m.png" alt="">Boat</span><span><img class="lic" src="icons/zeppelin-m.png" alt="">Zeppelin</span>`;
   const rows=[],seen=new Set();for(const t of [...G.trans,["Tram","Deeprun Tram","A"]]){if(seen.has(t[1]))continue;seen.add(t[1]);rows.push(t)}
   $("ttable").innerHTML=rows.map(t=>`<tr><td>${t[0]}${NEWR.has(t[1])?` <span class="badge" style="background:var(--new);color:#1b1b1b">New</span>`:""}</td><td>${esc(t[1]).replace(/ - /g," ↔ ")}${t[1]==LOOP?" (one-way loop: Menethil → Southshore → Auberdine → Menethil)":""}${t[0]=="Skyship"?" (Zephras Isle floats in Skywall; it's drawn north of the Maelstrom)":""}</td><td>${t[2]=="AH"?"Both":t[2]=="A"?"Alliance":"Horde"}</td></tr>`).join("")}
-const linkFor=()=>{const p=new URLSearchParams({f:fac});const sl=id=>slug(N[id].name).replace(/^-|-$/g,"");if(from!=null)p.set("from",sl(from));if(to!=null)p.set("to",sl(to));vias.forEach(v=>{if(v!=null)p.append("via",sl(v))});return p.toString()};
+const linkFor=()=>{const p=new URLSearchParams({f:fac});const sl=id=>slug(N[id].name).replace(/^-|-$/g,"");if(from!=null)p.set("from",sl(from));if(to!=null)p.set("to",sl(to));vias.forEach(v=>{if(v!=null)p.append("via",sl(v))});avoid.forEach(v=>p.append("avoid",sl(v)));return p.toString()};
 const syncLink=()=>{const has=from!=null||to!=null;$("shareRow").hidden=!(from!=null&&to!=null);
   try{history.replaceState(null,"",has?"?"+linkFor():location.pathname)}catch(e){}};
 // bigger screens open on one search box; it becomes the directions panel once a start or destination is chosen
@@ -513,6 +545,7 @@ function update(refit){
   document.documentElement.dataset.fac=fac;searchMode();
   $("fA").setAttribute("aria-pressed",fac=="A");$("fH").setAttribute("aria-pressed",fac=="H");
   if(from!=null&&!vis(from))from=null;if(to!=null&&!vis(to))to=null;vias=vias.map(v=>v!=null&&!vis(v)?null:v);
+  {const k=fac+tripKey();if(k!=avoidKey){avoid.clear();avoidKey=k}}
   $("addRow").hidden=!(from!=null&&to!=null&&vias.length<3);
   syncInputs();solve();renderRoutes();syncChar();renderStatic();
   if(popId!=null&&!vis(popId))closePop();
@@ -584,7 +617,8 @@ const ro=new ResizeObserver(()=>draw());ro.observe(svg);
 // shareable links: ?f=A&from=stormwind&to=ratchet opens that route. Names are matched within the faction
 const fromLink=(()=>{try{const q=new URLSearchParams(location.search);const f=q.get("f");if(f!="A"&&f!="H")return false;
   const find=v=>{if(!v)return null;const c=Object.values(N).filter(o=>slug(o.name).replace(/^-|-$/g,"")==v&&o.f.has(f));return c.length?c[0].id:null};
-  const a=find(q.get("from")),b=find(q.get("to"));if(a==null&&b==null)return false;fac=f;from=a;to=b;vias=q.getAll("via").map(find).filter(v=>v!=null).slice(0,3);return true}catch(e){return false}})();
+  const a=find(q.get("from")),b=find(q.get("to"));if(a==null&&b==null)return false;fac=f;from=a;to=b;vias=q.getAll("via").map(find).filter(v=>v!=null).slice(0,3);
+  avoid=new Set(q.getAll("avoid").map(find).filter(v=>v!=null&&N[v].fp));avoidKey=fac+tripKey();return true}catch(e){return false}})();
 $("cpTog").onclick=()=>{const t=$("cpTog");t.setAttribute("aria-expanded",t.getAttribute("aria-expanded")!="true")};
 {const head=card.querySelector(".head");let s0=null,glideT=0;
   const fullH=()=>innerHeight-64,headH=()=>head.offsetHeight;
