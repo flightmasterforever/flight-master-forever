@@ -410,7 +410,7 @@ function renderRoutes(){const box=$("routes");
     // "Not learned?" on each flight point the trip flies to or through (not the start: you learn it there)
     const no=id=>id!=from&&N[id].fp&&!avoid.has(id)?`<button class="nofp" data-no="${id}" aria-label="I haven't learned ${esc(N[id].name)}">Not learned?</button>`:"";
     const list=i==ri&&!(one&&!(st[0].via||[]).length&&!(st[0].kind=="fly"&&no(st[0].b)))?`<ol class="steps">${st.map((s,k)=>`<li${s.via&&s.via.length?' class="via"':""}><span class="num">${k+1}</span><div><span class="sic">${icon(s)}</span>${
-      s.kind=="fly"?`Fly to ${nz(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}${no(v)}</li>`).join("")}</ul>`:""}${one&&!no(s.b)?"":`<div class="t">${[one?"":fmtT(s.t)+(s.rebook?" · new flight":""),no(s.b)].filter(Boolean).join(" · ")}</div>`}`:
+      s.kind=="fly"?`Fly to ${nz(s.b)}${no(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}${no(v)}</li>`).join("")}</ul>`:""}${one?"":`<div class="t">${fmtT(s.t)}${s.rebook?" · new flight":""}</div>`}`:
       s.kind=="ride"?`${s.label} to ${nz(s.b)}<div class="t">5 min${s.route==LOOP?" · one-way loop":""}</div>`:
       s.kind=="tele"?(s.label==TRANSPONDER?`Teleporter to ${nz(s.b)}<div class="t">&lt;1 min</div>`:`${esc(s.label)}${s.label=="Hearthstone"?` to ${nz(s.b)}`:""}<div class="t">10 sec cast</div>`):
       `${s.label=="portal"?"Take the portal":"Run"} to ${nz(s.b)}<div class="t">${fmtT(s.t)}</div>`}</div></li>${s.stopEnd?`<li class="stopmark"><span class="smk"></span><div>Stop at ${nz(s.b)}</div></li>`:""}`).join("")}</ol>`:"";
