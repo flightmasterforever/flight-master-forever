@@ -161,6 +161,7 @@ const IC={
 const icon=l=>l.kind=="fly"?IC.fly:l.kind=="ride"?IC[l.label]||IC.Boat:l.kind=="walk"?IC.walk:l.label=="Hearthstone"?IC.hearth:IC.tele;
 
 // ---- map drawing ----
+const CAVE_BIG=100;  // map units squared: a cave lying over more ground than this is "big" (see the caves in draw())
 const svg=$("map");const home={x:0,y:0,w:MW,h:MH};let vb={...home};
 // the view stays on the parchment: dragging or zooming stops at its edges (if the view is ever wider or taller
 // than the sheet, it's centered on it instead). Set KEEP_ON_MAP to false to allow dragging off the edge again
@@ -254,6 +255,7 @@ function declutter(k){
     if(!ok){if(spots[0]){t.setAttribute("x",spots[0][0]);t.setAttribute("y",spots[0][1]);t.setAttribute("text-anchor",spots[0][2])}
       t.style.display="none";const g=t.parentNode;if(g&&g.classList&&g.classList.contains("n")&&!g.querySelector("title")){const ti=document.createElementNS("http://www.w3.org/2000/svg","title");ti.textContent=t.textContent;g.appendChild(ti)}}}
 }
+// the seas: [x, y, letter size (map units), name]
 const BT=512;/* baked tile size, in map units */
 function draw(){
   const pw=(svg.clientWidth-2*OX)||900,ph=(svg.clientHeight-2*OY)||600;const k=Math.max(vb.w/pw,vb.h/ph);
@@ -269,6 +271,8 @@ function draw(){
     const tiles=(set,op)=>{for(let r=0;r*BT<MH;r++)for(let c=0;c*BT<MW;c++)if(inView(c*BT,r*BT,BT,BT))s+=`<image href="bake/${set}_${r}_${c}.webp" x="${c*BT}" y="${r*BT}" width="${BT+0.4}" height="${BT+0.4}" preserveAspectRatio="none" style="opacity:${op}"/>`};
     if(deep<1)tiles("near",hop);if(deep>0)tiles("deep",deep*hop);
     for(const t of G.hires3)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]+0.4}" height="${t[4]+0.4}" preserveAspectRatio="none" style="opacity:${hop}"/>`;
+    // land no zone map covers: Gilneas, from Blizzard's own map of it (source/data-tools/gilneas.py)
+    if(G.gaps)for(const t of G.gaps)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]}" height="${t[4]}" preserveAspectRatio="none" style="opacity:${hop}"/>`;
     // the zone art above is ~3.5 pixels a map unit, which squeezes the small zones (their place names end up a few
     // pixels tall). Zoomed in past that, each small zone's own full-size game map goes on top, soft-edged and
     // color-matched (source/data-tools/zone-art.py); only the zones on screen are fetched, and only this close in
@@ -279,6 +283,14 @@ function draw(){
   // minimap terrain fades in on top (14 pixels a map unit: source/data-tools/minimap.py); only tiles on screen load
   const mq=(window.devicePixelRatio||1)/k,mop=mq>9?Math.min(1,(mq-9)/3):0;
   if(mop>0&&G.mini)for(const t of G.mini)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]+0.2}" height="${t[4]+0.2}" preserveAspectRatio="none" style="opacity:${mop}"/>`;
+  // caves, mines and tunnels as the game's minimap draws them inside (Stonewrought Pass, the Timbermaw tunnel ...),
+  // over the ground above them, at the same zoom (source/data-tools/caves.py). Tunnels and small caves show with the
+  // minimap; a big cave lies over a lot of ground (a town, a gorge), so it comes up only as it fills the view, the
+  // way the game shows it once you're inside: from a view 4 times its size to 1.8 times
+  if(mop>0&&G.caves)for(const t of G.caves)if(inView(t[1],t[2],t[3],t[4])){
+    const fill=Math.min(vb.w/t[3],vb.h/t[4]),big=t[5]>CAVE_BIG;
+    const op=mop*(big?Math.min(1,Math.max(0,(4-fill)/2.2)):1);
+    if(op>0.01)s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]}" height="${t[4]}" preserveAspectRatio="none" style="opacity:${op}"/>`}
   // Zephras Isle floats in Skywall (the plane of air); Blizzard gives it no place on Azeroth, so it is drawn in the open sky north of the Maelstrom, at true scale
   // (its halo and drop shadow are baked into the picture: source/data-tools/bake-sprites.js)
   if(G.isle){const [ix,iy,iw,ih]=G.isle;s+=`<image href="isle-baked.webp" x="${ix-.3*iw}" y="${iy-.3*ih}" width="${1.6*iw}" height="${1.7*ih}" preserveAspectRatio="none"/>
