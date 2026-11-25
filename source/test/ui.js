@@ -33,5 +33,22 @@
     F.set(IF.id, all.find(o => o.name === "Booty Bay" && o.f.has("A")).id); F.update();
     if (box.querySelector("[data-un]")) bad.push("left-out flight points carried over to a new trip");
   }
+  // "On cooldown?" on a hearthstone step re-plans without it; the chip's ✕ brings it back
+  {
+    F.setFac("A"); F.setCh({ hearth: { A: 2, H: null }, mage: 0, druid: false, gadget: false, ever: false, gnome: false });
+    const RA = all.find(o => o.name === "Ratchet" && o.f.has("A")), SW = all.find(o => o.name === "Stormwind" && o.f.has("A"));
+    F.set(RA.id, SW.id); F.update();
+    const box = document.getElementById("routes"), before = box.innerText, cd = box.querySelector('[data-cd="Hearthstone"]');
+    if (!cd) bad.push("no On cooldown? link on the hearthstone step (Ratchet -> Stormwind, hearth Stormwind)");
+    else {
+      cd.click();
+      if (F.routes.some(r => r.legs.some(l => l.label === "Hearthstone"))) bad.push("a route still uses the hearthstone on cooldown");
+      if (!box.querySelector('[data-uc="Hearthstone"]')) bad.push("no On cooldown chip");
+      if (!/cd=hearthstone/.test(location.search)) bad.push("route link doesn't carry the cooldown");
+      box.querySelector('[data-uc="Hearthstone"]').click();
+      if (box.innerText !== before) bad.push("removing the cooldown chip didn't restore the route");
+    }
+    F.setCh({ hearth: { A: null, H: null } });
+  }
   return { rendered: n, bad: bad.slice(0, 30), badCount: bad.length };
 })()
