@@ -101,7 +101,7 @@ try{fac=localStorage.getItem("fmf-fac")||"A";const c=JSON.parse(localStorage.get
 const save=()=>{try{localStorage.setItem("fmf-fac",fac);localStorage.setItem("fmf-char",JSON.stringify(ch))}catch(e){}};
 let from=null,to=null,routes=[],ri=0,popId=null;
 let vias=[];/* stops on the way, in order (null: a stop row not filled in yet) */
-// flight points the player said they don't have, for this trip only ("Don't have this?" in the directions).
+// flight points the player said they don't have, for this trip only ("Not learned?" in the directions).
 // They're cleared when the trip changes. You still learn a flight point by talking to its flight master, so the place
 // you start from always counts as learned, and a destination you don't have is reached on foot from a nearby one
 let avoid=new Set(),avoidKey="";
@@ -388,7 +388,7 @@ function renderRoutes(){const box=$("routes");
   if(from==null||to==null){box.innerHTML=`<p class="empty">${from==null?"Choose where you're starting, or "+(phone.matches?"tap":"click")+" a flight point on the map.":"Now choose a destination."}</p>`;return}
   if(!routes.length){box.innerHTML=`<p class="empty">You're already there.</p>`;return}
   // flight points left out of this trip, each with a ✕ to put it back
-  const chips=avoid.size?`<div class="avoid" role="group" aria-label="Flight points left out of this trip"><span class="avl">Avoiding:</span>${[...avoid].map(id=>`<button class="chip" data-un="${id}" aria-label="Stop avoiding ${esc(N[id].name)}"><span>${esc(N[id].name)}</span><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>`).join("")}</div>`:"";
+  const chips=avoid.size?`<div class="avoid" role="group" aria-label="Flight points left out of this trip"><span class="avl">Not learned:</span>${[...avoid].map(id=>`<button class="chip" data-un="${id}" aria-label="I have ${esc(N[id].name)} after all"><span>${esc(N[id].name)}</span><svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>`).join("")}</div>`:"";
   const wire=()=>{box.querySelectorAll("[data-no],[data-un]").forEach(b=>b.onclick=e=>{e.stopPropagation();const id=+(b.dataset.no??b.dataset.un);
       if(b.dataset.no!=null)avoid.add(id);else avoid.delete(id);update(true);
       // keep the keyboard where it was: on the new chip, or back on the panel after one is removed
@@ -407,8 +407,8 @@ function renderRoutes(){const box=$("routes");
     const name=r.stops?`Stops at ${r.stops.map(nm).join(", ")}`:mid.length?`via ${mid.slice(0,2).join(", ")}${mid.length>2?"…":""}`:main.kind=="fly"?(main.via&&main.via.length?`One flight, ${main.via.length} stop${main.via.length>1?"s":""}`:"Direct flight"):esc(main.label=="portal"?"Portal":main.label||"Ride");
     const sum=`<div class="rhead"><span class="rmode">${icon(main)}</span><div class="rt"><div class="rname">${name}</div>${why[i]?`<div class="rwhy">${why[i]}</div>`:""}</div><div class="rnum"><b>${fmtTot(r.total)}</b>${r.fare?`<small>${money(r.fare)}</small>`:routes.some(o=>o.fare)?`<small>Free</small>`:""}</div></div>`;
     const one=st.length==1;
-    // "Don't have this?" on each flight point the trip flies to or through (not the start: you learn it there)
-    const no=id=>id!=from&&N[id].fp&&!avoid.has(id)?`<button class="nofp" data-no="${id}" aria-label="I don't have ${esc(N[id].name)}">Don't have this?</button>`:"";
+    // "Not learned?" on each flight point the trip flies to or through (not the start: you learn it there)
+    const no=id=>id!=from&&N[id].fp&&!avoid.has(id)?`<button class="nofp" data-no="${id}" aria-label="I haven't learned ${esc(N[id].name)}">Not learned?</button>`:"";
     const list=i==ri&&!(one&&!(st[0].via||[]).length&&!(st[0].kind=="fly"&&no(st[0].b)))?`<ol class="steps">${st.map((s,k)=>`<li${s.via&&s.via.length?' class="via"':""}><span class="num">${k+1}</span><div><span class="sic">${icon(s)}</span>${
       s.kind=="fly"?`Fly to ${nz(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}${no(v)}</li>`).join("")}</ul>`:""}${one&&!no(s.b)?"":`<div class="t">${[one?"":fmtT(s.t)+(s.rebook?" · new flight":""),no(s.b)].filter(Boolean).join(" · ")}</div>`}`:
       s.kind=="ride"?`${s.label} to ${nz(s.b)}<div class="t">5 min${s.route==LOOP?" · one-way loop":""}</div>`:

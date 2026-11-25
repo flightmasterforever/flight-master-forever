@@ -16,16 +16,16 @@
       if (/No route/.test(card)) bad.push(`${fac} ${a.name} -> ${b.name}: no route shown`);
     }
   }
-  // "Don't have this?" adds a chip and re-plans without that flight point; the chip's ✕ puts it back
+  // "Not learned?" adds a chip and re-plans without that flight point; the chip's ✕ puts it back
   F.setFac("A"); F.setCh({ hearth: { A: null, H: null }, mage: 0, druid: false, gadget: false, ever: false, gnome: false });
   const IF = all.find(o => o.name === "Ironforge" && o.f.has("A")), GZ = all.find(o => o.name === "Gadgetzan" && o.f.has("A"));
   F.set(IF.id, GZ.id); F.update();
   const box = document.getElementById("routes"), before = box.innerText, link = box.querySelector("[data-no]");
-  if (!link) bad.push("no Don't have this? link on Ironforge -> Gadgetzan");
+  if (!link) bad.push("no Not learned? link on Ironforge -> Gadgetzan");
   else {
     const x = +link.dataset.no; link.click();
     const chip = box.querySelector(`[data-un="${x}"]`);
-    if (!chip) bad.push("no Avoiding chip after Don't have this?");
+    if (!chip) bad.push("no Not learned chip after Not learned?");
     if (F.routes[0].legs.some(l => l.kind === "fly" && (l.b === x || (l.via || []).includes(x)))) bad.push("route still flies through the left-out flight point");
     if (!/avoid=/.test(location.search)) bad.push("route link doesn't carry the left-out flight point");
     if (chip) { chip.click(); if (box.querySelector("[data-un]")) bad.push("chip didn't go away"); if (box.innerText !== before) bad.push("removing the chip didn't restore the route") }

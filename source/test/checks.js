@@ -119,7 +119,7 @@
     }
   }
 
-  // ---------- E. "Don't have this?": leaving out a flight point the fastest route uses ----------
+  // ---------- E. "Not learned?": leaving out a flight point the fastest route uses ----------
   R.avoid = { tried: 0, unreachable: [], problems: [] };
   for (const fac of ["A", "H"]) {
     F.setFac(fac); F.setCh(base);
