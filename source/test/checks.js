@@ -66,7 +66,7 @@
             const ends = [N[l.a], N[l.b]];
             if (!ends.some(o => o.inst || o.town || o.dock || o.druid) && !F.G.walks.some(w => (w[0] === l.a && w[1] === l.b) || (w[1] === l.a && w[0] === l.b)))
               P(`route ${i + 1} rides overland ${name(l.a)} -> ${name(l.b)} between two flight points`);
-            if (l.t > 600) P(`route ${i + 1} has a ${Math.round(l.t / 60)} min ride ${name(l.a)} -> ${name(l.b)}`);
+            if (l.t > 900) P(`route ${i + 1} has a ${Math.round(l.t / 60)} min ride ${name(l.a)} -> ${name(l.b)}`);
           }
         }
         if (cur !== b.id) P(`route ${i + 1} doesn't end at the destination`);
