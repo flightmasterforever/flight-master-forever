@@ -294,7 +294,7 @@ function draw(){
   s+=`</g>`;
   if(route&&route.legs.length){s+=`<g fill="none" stroke-linecap="round">`;
     for(const l of route.legs){const d=legD(l);const tele=l.kind=="tele";const dash=l.kind=="fly"?[14*k,4*k]:[6*k,6*k];
-      s+=`<path d="${d}" stroke="#1b1208" stroke-width="${8*k}" stroke-opacity="${tele?.35:.7}"/><path class="rline" d="${d}" stroke="${tele?"#b98cff":"var(--route)"}" stroke-width="${4*k}" stroke-dasharray="${dash.join(" ")}" style="--dash:${-(dash[0]+dash[1])}px;animation-duration:${(dash[0]+dash[1])/k/DASH_PX_S}s"/>`}
+      s+=`<path d="${d}" stroke="#1b1208" stroke-width="${8*k}" stroke-opacity="${tele?.35:.7}"/><path class="rline" d="${d}" stroke="${tele?"#b98cff":l.kind=="walk"?"#e8413a":"var(--route)"}" stroke-width="${4*k}" stroke-dasharray="${dash.join(" ")}" style="--dash:${-(dash[0]+dash[1])}px;animation-duration:${(dash[0]+dash[1])/k/DASH_PX_S}s"/>`}
     s+=`</g>`}
   // the game's own boat and zeppelin icons at each dock and tower; bigger for the ones this route uses
   {const used=new Set(route?route.legs.filter(l=>l.kind=="ride").map(l=>l.route):[]);
