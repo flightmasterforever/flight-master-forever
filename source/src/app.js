@@ -255,6 +255,8 @@ function declutter(k){
     if(!ok){if(spots[0]){t.setAttribute("x",spots[0][0]);t.setAttribute("y",spots[0][1]);t.setAttribute("text-anchor",spots[0][2])}
       t.style.display="none";const g=t.parentNode;if(g&&g.classList&&g.classList.contains("n")&&!g.querySelector("title")){const ti=document.createElementNS("http://www.w3.org/2000/svg","title");ti.textContent=t.textContent;g.appendChild(ti)}}}
 }
+// the seas: [x, y, letter size (map units), name]
+const SEA_NAMES=[[140,420,26,"Veiled Sea"],[1709.8,897,30,"Great Sea"],[2886.6,799,30,"Forbidding Sea"]];
 const BT=512;/* baked tile size, in map units */
 function draw(){
   const pw=(svg.clientWidth-2*OX)||900,ph=(svg.clientHeight-2*OY)||600;const k=Math.max(vb.w/pw,vb.h/ph);
@@ -270,6 +272,8 @@ function draw(){
     const tiles=(set,op)=>{for(let r=0;r*BT<MH;r++)for(let c=0;c*BT<MW;c++)if(inView(c*BT,r*BT,BT,BT))s+=`<image href="bake/${set}_${r}_${c}.webp" x="${c*BT}" y="${r*BT}" width="${BT+0.4}" height="${BT+0.4}" preserveAspectRatio="none" style="opacity:${op}"/>`};
     if(deep<1)tiles("near",hop);if(deep>0)tiles("deep",deep*hop);
     for(const t of G.hires3)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]+0.4}" height="${t[4]+0.4}" preserveAspectRatio="none" style="opacity:${hop}"/>`;
+    // land no zone map covers: Gilneas, from Blizzard's own map of it (source/data-tools/gilneas.py)
+    if(G.gaps)for(const t of G.gaps)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]}" height="${t[4]}" preserveAspectRatio="none" style="opacity:${hop}"/>`;
     // the zone art above is ~3.5 pixels a map unit, which squeezes the small zones (their place names end up a few
     // pixels tall). Zoomed in past that, each small zone's own full-size game map goes on top, soft-edged and
     // color-matched (source/data-tools/zone-art.py); only the zones on screen are fetched, and only this close in
@@ -292,6 +296,11 @@ function draw(){
   // (its halo and drop shadow are baked into the picture: source/data-tools/bake-sprites.js)
   if(G.isle){const [ix,iy,iw,ih]=G.isle;s+=`<image href="isle-baked.webp" x="${ix-.3*iw}" y="${iy-.3*ih}" width="${1.6*iw}" height="${1.7*ih}" preserveAspectRatio="none"/>
     <text class="lb" data-p="2" x="${ix+iw/2}" y="${iy+ih+16*k}" text-anchor="middle" font-style="italic" font-size="${10.5*k}" fill="#eef3f8" stroke="#1b1208" stroke-width="${2.6*k}" opacity=".95">${k>=1.9?"Zephras Isle · ":""}Skywall, plane of air</text>`}
+  // the seas' names, lettered live (crisp at any zoom) where Blizzard's continent maps letter them; spots measured on
+  // that art by OpenMap (Data/Forever/Labels.lua, MIT). (The continents' names are in the world map art itself.)
+  {const sop=k>0.5?Math.min(1,(k-0.5)/0.4)*.7:0;
+   const lab=(t,x,y,fs,sp)=>`<text x="${x}" y="${y}" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="${fs}" letter-spacing="${sp*fs}" fill="#4a4232" stroke="rgba(168,172,152,.45)" stroke-width="${fs*.08}" paint-order="stroke" opacity="${sop}">${t}</text>`;
+   if(sop>0)for(const [x,y,a,b] of SEA_NAMES)s+=lab("THE",x,y-a*1.05,a*.7,.12)+lab(b,x,y,a,.12)}
   if(k<1.9){s+=`<g text-anchor="middle" font-style="italic" stroke-width="${2.6*k}">`;
     for(const z of G.zones)s+=`<text class="lb" data-p="3" data-zr="${z[2]},${z[3]},${z[4]},${z[5]}" x="${z[2]+z[4]/2}" y="${z[3]+z[5]/2}" font-size="${11*k}" fill="${z[6]?"#ffd36b":"#f3ead7"}" opacity=".9">${esc(z[0])}${z[1]?` <tspan font-size="${10*k}">${z[1]}</tspan>`:""}</text>`;s+=`</g>`}
   const dim=route?.35:1;
