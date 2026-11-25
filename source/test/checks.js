@@ -119,6 +119,47 @@
     }
   }
 
+  // ---------- E. "Not learned?": leaving out a flight point the fastest route uses ----------
+  R.avoid = { tried: 0, unreachable: [], problems: [] };
+  for (const fac of ["A", "H"]) {
+    F.setFac(fac); F.setCh(base);
+    const pts = nodes.filter(o => o.f.has(fac) && !o.druid && !o.inst);
+    for (let i = 0; i < 150; i++) {
+      const a = pts[(i * 37) % pts.length], b = pts[(i * 89 + 7) % pts.length];
+      if (a.id === b.id || a.name === b.name) continue;
+      F.setAvoid([]); F.set(a.id, b.id); F.solve();
+      const r0 = F.routes[0]; if (!r0 || r0.none) continue;
+      const used = [];
+      for (const l of r0.legs) if (l.kind === "fly") for (const id of [...(l.via || []), l.b]) if (id !== a.id && N[id].fp && !used.includes(id)) used.push(id);
+      for (const x of used) {
+        F.setAvoid([x]); F.solve(); R.avoid.tried++;
+        const P = m => R.avoid.problems.length < 40 && R.avoid.problems.push(`${fac} ${a.name} -> ${b.name} without ${name(x)}: ${m}`);
+        const rs = F.routes;
+        if (!rs.length || rs[0].none) { R.avoid.unreachable.push(`${fac} ${a.name} -> ${b.name} without ${name(x)}`); continue }
+        rs.forEach((r, k) => {
+          let cur = a.id, sum = 0;
+          if (!r.ex || !r.ex.has(x)) P(`route ${k + 1} doesn't record ${name(x)} as left out`);
+          r.legs.forEach((l, j) => {
+            if (l.a !== cur) P(`route ${k + 1} legs don't chain`); cur = l.b; sum += l.t;
+            if (l.kind === "fly") {
+              if (l.a === x || l.b === x || (l.via || []).includes(x)) P(`route ${k + 1} still flies to or through ${name(x)}`);
+              const dir = EDGE.has(edgeKey(l.a, l.b)), game = gameChain(l.a, l.b, r.ex);
+              if (!game) P(`route ${k + 1} flies ${name(l.a)} -> ${name(l.b)}, which the game can't book`);
+              else if (JSON.stringify(dir ? [] : game) !== JSON.stringify(l.via || [])) P(`route ${k + 1} flight ${name(l.a)} -> ${name(l.b)} stops don't match the game`);
+            }
+          });
+          if (cur !== b.id) P(`route ${k + 1} doesn't end at the destination`);
+          if (Math.abs(sum - r.total) > 0.01) P(`route ${k + 1} total doesn't add up`);
+          // (running across to somewhere the flights no longer reach can beat flying all the way round)
+          const known = l => [...F.G.walks, ...F.G.towns].some(w => (w[0] === l.a && w[1] === l.b) || (w[1] === l.a && w[0] === l.b));
+          const ranIn = r.legs.some(l => l.kind === "walk" && !known(l));
+          if (!ranIn && r.total + 0.5 < r0.total) P(`route ${k + 1} is faster than the route with every flight point`);
+        });
+      }
+    }
+  }
+  F.setAvoid([]);
+
   // ---------- D. spot checks against known in-game journeys ----------
   const byName = (n, fac) => nodes.find(o => o.name === n && o.f.has(fac) && (!o.druid || n === 'Nighthaven'));
   const spot = (fac, a, b, expect, o = {}) => {

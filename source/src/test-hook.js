@@ -1,1 +1,1 @@
-window.__fm={N,EDG,TR,G,DOCKS,graph,dijkstra,solve,steps,secs,vis,fly,tUse,YPU,flights,get routes(){return routes},get ch(){return ch},setCh:o=>{ch={...ch,...o}},set:(f,t)=>{from=f;to=t},update:()=>update(false),setFac:x=>{fac=x},LOOP};
+window.__fm={N,EDG,TR,G,DOCKS,graph,dijkstra,solve,steps,secs,vis,fly,tUse,YPU,flights,get routes(){return routes},get ch(){return ch},setCh:o=>{ch={...ch,...o}},set:(f,t)=>{from=f;to=t},setAvoid:a=>{avoid=new Set(a);avoidKey=fac+tripKey()},get avoid(){return avoid},update:()=>update(false),setFac:x=>{fac=x},LOOP};

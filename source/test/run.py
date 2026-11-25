@@ -23,6 +23,10 @@ with sync_playwright() as p:
         print(f"\n{f}: {o['pairs']} pairs, unreachable {len(o['unreachable'])}, problems {len(o['problems'])}, slowest {o['slowest']}")
         for x in o["unreachable"][:20]: print("   UNREACH", x)
         for x in o["problems"][:40]: print("   PROB", x)
+    A = R["avoid"]
+    print(f"\nDON'T HAVE THIS: {A['tried']} tried, unreachable {len(A['unreachable'])}, problems {len(A['problems'])}")
+    for x in A["unreachable"][:20]: print("   UNREACH", x)
+    for x in A["problems"][:40]: print("   PROB", x)
     print("\nOPTIONS"); [print("  ", o) for o in R["options"]]
     print("\nSPOT"); [print("  ", "OK " if s["ok"] else "BAD", s["fac"], s["route"], "=>", s["got"]) for s in R["spot"]]
     print("perf", R["perf"])
