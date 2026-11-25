@@ -91,6 +91,41 @@ const TR=G.trans.filter(t=>t[3]!=null&&t[4]!=null&&N[t[3]]&&N[t[4]]).map(t=>t.sl
 const LOOP="Menethil - Southshore - Auberdine";
 let YPU=15;{const r=[];for(const e of G.edges){const p=e[4];let L=0;for(let k=2;k<p.length;k+=2)L+=Math.hypot(p[k]-p[k-2],p[k+1]-p[k-1]);if(L>20)r.push(e[3]/L)}r.sort((a,b)=>a-b);if(r.length)YPU=r[r.length>>1]}
 const dist=(a,b)=>Math.hypot(N[a].x-N[b].x,N[a].y-N[b].y);
+// "Run to" legs follow the roads, traced over the game's own minimap (source/data-tools/roads.py): from the start to the
+// nearest road, along the roads, and off the road at the nearest point to the end. Run time is that length at 9 yd/s.
+// When the roads don't join the two places sensibly (no road between them, or a detour over 3x the straight line), it's a straight line.
+const RD=(()=>{const p=(G.roads||{p:[]}).p,e=(G.roads||{e:[]}).e,n=p.length/2,adj=Array.from({length:n},()=>[]);
+  for(let i=0;i<e.length;i+=2){const a=e[i],b=e[i+1],w=Math.hypot(p[2*a]-p[2*b],p[2*a+1]-p[2*b+1]);adj[a].push(b,w);adj[b].push(a,w)}
+  // the points on the roads near (x,y), one per stretch, nearest first: [distance, edge start, edge end, x, y].
+  // Every stretch within 20 units of the nearest is tried, so a town between two roads leaves by the one that leads the right way
+  const near=(x,y)=>{const c=[];for(let i=0;i<e.length;i+=2){const a=e[i],b=e[i+1],ax=p[2*a],ay=p[2*a+1],dx=p[2*b]-ax,dy=p[2*b+1]-ay,L=dx*dx+dy*dy||1;
+    const t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/L)),qx=ax+t*dx,qy=ay+t*dy;c.push([Math.hypot(x-qx,y-qy),a,b,qx,qy])}
+    c.sort((u,v)=>u[0]-v[0]);return c.filter(q=>q[0]<=c[0][0]+20).slice(0,8)};
+  const cache=new Map();
+  const path=(A,B)=>{const SS=near(A.x,A.y),TT=near(B.x,B.y);if(!SS.length||!TT.length)return null;
+    const P=(i,j)=>Math.hypot(p[2*i]-j[3],p[2*i+1]-j[4]);let best=Infinity,res=null;
+    // both ends on the same stretch of road
+    for(const S of SS)for(const T of TT)if((S[1]==T[1]&&S[2]==T[2])||(S[1]==T[2]&&S[2]==T[1])){const L=S[0]+Math.hypot(S[3]-T[3],S[4]-T[4])+T[0];
+      if(L<best){best=L;res={pts:[[A.x,A.y],[S[3],S[4]],[T[3],T[4]],[B.x,B.y]],len:L}}}
+    const d=new Float64Array(n).fill(Infinity),prev=new Int32Array(n).fill(-1),from=new Map(),h=[];
+    const push=(v,k)=>{h.push([k,v]);let i=h.length-1;while(i){const q=(i-1)>>1;if(h[q][0]<=h[i][0])break;[h[q],h[i]]=[h[i],h[q]];i=q}};
+    const pop=()=>{const top=h[0],last=h.pop();if(h.length){h[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<h.length&&h[l][0]<h[m][0])m=l;if(r<h.length&&h[r][0]<h[m][0])m=r;if(m==i)break;[h[m],h[i]]=[h[i],h[m]];i=m}}return top};
+    for(const S of SS)for(const v of [S[1],S[2]]){const k=S[0]+P(v,S);if(k<d[v]){d[v]=k;from.set(v,S);push(v,k)}}
+    const goal=new Map();for(const T of TT)for(const v of [T[1],T[2]]){const k=P(v,T)+T[0];if(!goal.has(v)||k<goal.get(v)[0])goal.set(v,[k,T])}
+    let end=-1;
+    while(h.length){const [k,u]=pop();if(k>d[u])continue;if(k>=best)break;if(goal.has(u)&&k+goal.get(u)[0]<best){best=k+goal.get(u)[0];end=u}
+      const a=adj[u];for(let i=0;i<a.length;i+=2){const v=a[i],nk=k+a[i+1];if(nk<d[v]){d[v]=nk;prev[v]=u;push(v,nk)}}}
+    if(end<0)return res;const ids=[];let u=end;for(;prev[u]>=0;u=prev[u])ids.unshift(u);ids.unshift(u);
+    const S=from.get(u),T=goal.get(end)[1];
+    return {pts:[[A.x,A.y],[S[3],S[4]],...ids.map(i=>[p[2*i],p[2*i+1]]),[T[3],T[4]],[B.x,B.y]],len:best}};
+  return (a,b)=>{const k=a+">"+b;if(cache.has(k))return cache.get(k);const A=N[a],B=N[b],s=Math.hypot(A.x-B.x,A.y-B.y);
+    let r=s<6?null:path(A,B);if(r&&r.len>3*s+10)r=null;r=r?{...r,road:true}:{pts:[[A.x,A.y],[B.x,B.y]],len:s,road:s<6};
+    cache.set(k,r);cache.set(b+">"+a,{...r,pts:[...r.pts].reverse()});return r}})();
+const runT=(a,b)=>RD(a,b).len*YPU/9;
+// choosing which nearby place to run from or to: by the real run (along the roads where they join)
+const runC=runT;
+// the k places (of list) nearest to id: the 5 nearest in a straight line, best by run first
+const near2=(id,list,k=2)=>list.filter(h=>h.id!=id).map(h=>[h,dist(id,h.id)]).sort((a,b)=>a[1]-b[1]).slice(0,5).map(x=>x[0]).sort((a,b)=>runC(id,a.id)-runC(id,b.id)).slice(0,k);
 const uniq=new Map();for(const [a,b] of EDG){const k=a<b?a+"~"+b:b+"~"+a;if(!uniq.has(k))uniq.set(k,[Math.min(a,b),Math.max(a,b)])}
 const lines=[...uniq.values()];
 const findNode=(name,f)=>Object.values(N).find(o=>o.name==name&&o.f.has(f)&&!o.druid);
@@ -181,7 +216,7 @@ function rideD(l){const a=N[l.a],b=N[l.b];const P=sailPts(l.route);if(P.length<2
   const near=o=>{let bi=0,bd=1e9;P.forEach((q,i)=>{const d=Math.hypot(q[0]-o.x,q[1]-o.y);if(d<bd){bd=d;bi=i}});return bi};
   let ia=near(a),ib=near(b),seg;if(ia<=ib)seg=P.slice(ia,ib+1);else if(l.route==LOOP)seg=P.slice(ia).concat(P.slice(0,ib+1));else seg=P.slice(ib,ia+1).reverse();
   return "M"+[[a.x,a.y],...seg,[b.x,b.y]].map(q=>q[0]+","+q[1]).join("L")}
-const legD=l=>{const a=N[l.a],b=N[l.b];return l.kind=="ride"?(l.label=="Tram"?`M${a.x},${a.y}L${b.x},${b.y}`:rideD(l)):l.kind=="fly"?pathD(flightPts(l)):l.kind=="tele"?curve(a,b):`M${a.x},${a.y}L${b.x},${b.y}`};
+const legD=l=>{const a=N[l.a],b=N[l.b];return l.kind=="ride"?(l.label=="Tram"?`M${a.x},${a.y}L${b.x},${b.y}`:rideD(l)):l.kind=="fly"?pathD(flightPts(l)):l.kind=="tele"?curve(a,b):l.kind=="walk"?"M"+RD(l.a,l.b).pts.map(q=>q[0].toFixed(1)+","+q[1].toFixed(1)).join("L"):`M${a.x},${a.y}L${b.x},${b.y}`};
 const inView=(x,y,w,h)=>{const m=Math.max(vb.w/Math.max(1,svg.clientWidth-2*OX),vb.h/Math.max(1,svg.clientHeight-2*OY)),mx=OX*m,my=OY*m;return !(x+w<vb.x-mx||x>vb.x+vb.w+mx||y+h<vb.y-my||y>vb.y+vb.h+my)};
 
 // labels never overlap: route names first, then flight points, then dungeons and the isle, then zone names.
@@ -255,7 +290,7 @@ function draw(){
   {const seen=new Set();for(const t of TR){if(!tUse(t)||seen.has(t[1]))continue;seen.add(t[1]);
     const d=t[0]=="Tram"?`M${N[2].x},${N[2].y}L${N[6].x},${N[6].y}`:sailD(t[1]);if(!d)continue;
     s+=`<path d="${d}" fill="none" stroke="${NEWR.has(t[1])?"#ffcf4a":"#f3ead7"}" stroke-opacity="${.85*dim}" stroke-width="${1.5*k}" stroke-dasharray="${1.5*k} ${4*k}"/>`}}
-  for(const [a,b] of G.walks){if(!vis(a)||!vis(b))continue;s+=`<line x1="${N[a].x}" y1="${N[a].y}" x2="${N[b].x}" y2="${N[b].y}" stroke="#f3ead7" stroke-opacity="${.6*dim}" stroke-width="${1.1*k}" stroke-dasharray="${1*k} ${3*k}"/>`}
+  for(const [a,b] of G.walks){if(!vis(a)||!vis(b))continue;s+=`<path fill="none" d="${legD({a,b,kind:"walk"})}" stroke="#f3ead7" stroke-opacity="${.6*dim}" stroke-width="${1.1*k}" stroke-dasharray="${1*k} ${3*k}"/>`}
   s+=`</g>`;
   if(route&&route.legs.length){s+=`<g fill="none" stroke-linecap="round">`;
     for(const l of route.legs){const d=legD(l);const tele=l.kind=="tele";const dash=l.kind=="fly"?[14*k,4*k]:[6*k,6*k];
@@ -314,15 +349,15 @@ function graph(opt){const g={},ex=noFrom(opt.ex);const add=(a,b,c,kind,label,cos
   // a dock tied to one faction's flight master in a shared town (Booty Bay) is used from this faction's flight master there
   const rv=id=>{if(vis(id))return id;const o=N[id];if(!NEUT.has(o.name))return null;const s=Object.values(N).find(n=>n.name==o.name&&vis(n.id));return s?s.id:null};
   if(opt.ride)for(const t of TR)if(tUse(t)){const a=rv(t[3]),b=rv(t[4]);if(a==null||b==null)continue;const tt=300;/* the tram counts the walk from each flight master and the wait too, like the boats: about 5 min door to door */add(a,b,tt,"ride",t[0],0,{route:t[1],t:tt})}
-  const walk=(a,b,tt,label)=>{if(!vis(a)||!vis(b))return;const c=tt??dist(a,b)*YPU/9;add(a,b,c,"walk",label||"",0,{t:c});add(b,a,c,"walk",label||"",0,{t:c})};
+  const walk=(a,b,tt,label)=>{if(!vis(a)||!vis(b))return;const c=tt??runT(a,b),w=tt??runC(a,b);add(a,b,w,"walk",label||"",0,{t:c});add(b,a,w,"walk",label||"",0,{t:c})};
   for(const [a,b] of G.walks)walk(a,b);
   for(const [a,b] of G.towns)walk(a,b,a==-104?60:null,a==-104?"portal":"");
   const hubs=Object.values(N).filter(o=>!o.inst&&fly(o.id));
-  if(opt.tele&&ch.mage>=50&&from!=DALARAN)hubs.map(h=>[h,dist(DALARAN,h.id)]).sort((a,b)=>a[1]-b[1]).slice(0,2).forEach(([h])=>{const c=dist(DALARAN,h.id)*YPU/9;add(DALARAN,h.id,c,"walk","",0,{t:c})});
+  if(opt.tele&&ch.mage>=50&&from!=DALARAN)near2(DALARAN,hubs).forEach(h=>{const c=runT(DALARAN,h.id);add(DALARAN,h.id,runC(DALARAN,h.id),"walk","",0,{t:c})});
   // an entrance is only ever the start or the end of a route, reached from its two nearest travel points
-  for(const o of Object.values(N))if(o.inst&&(o.id==from||o.id==to))hubs.map(h=>[h,dist(o.id,h.id)]).sort((a,b)=>a[1]-b[1]).slice(0,2).forEach(([h])=>{const c=dist(o.id,h.id)*YPU/9;o.id==to?add(h.id,o.id,c,"walk","",0,{t:c}):add(o.id,h.id,c,"walk","",0,{t:c})});
+  for(const o of Object.values(N))if(o.inst&&(o.id==from||o.id==to))near2(o.id,hubs).forEach(h=>{const c=runT(o.id,h.id),w=runC(o.id,h.id);o.id==to?add(h.id,o.id,w,"walk","",0,{t:c}):add(o.id,h.id,w,"walk","",0,{t:c})});
   // a destination whose flight point you don't have: fly to one of the two nearest you do have and run the rest
-  if(ex&&ex.has(to)&&N[to].fp)hubs.filter(h=>h.id!=to&&!ex.has(h.id)&&LAND[h.id]==LAND[to]).map(h=>[h,dist(to,h.id)]).sort((a,b)=>a[1]-b[1]).slice(0,2).forEach(([h])=>{const c=dist(to,h.id)*YPU/9;add(h.id,to,c,"walk","",0,{t:c})});
+  if(ex&&ex.has(to)&&N[to].fp){const ns=hubs.filter(h=>h.id!=to&&!ex.has(h.id)&&LAND[h.id]==LAND[to]);near2(to,ns).forEach(h=>{const c=runT(h.id,to);add(h.id,to,runC(h.id,to),"walk","",0,{t:c})})}
   {const nh=Object.values(N).find(o=>o.druid&&o.f.has(fac)),mg=findNode("Moonglade",fac);if(nh&&mg)walk(nh.id,mg.id,20)}
   // Horde with the Goblin Transponder: Scooty's two-way teleporter, Booty Bay <-> the Gnomeregan entrance
   if(fac=="H"&&ch.gnome){const bb=findNode("Booty Bay","H");if(bb){add(bb.id,GNOMER,20,"tele",TRANSPONDER,0,{t:20});add(GNOMER,bb.id,20,"tele",TRANSPONDER,0,{t:20})}}
@@ -346,8 +381,8 @@ const LAND={};{const up=x=>LAND[x]==null||LAND[x]==x?(LAND[x]=x):(LAND[x]=up(LAN
 function runIn(g,ex){const seen=new Set([from]),q=[from];while(q.length){const u=q.pop();for(const e of g[u]||[])if(!seen.has(e.b)){seen.add(e.b);q.push(e.b)}}
   const hubs=Object.values(N).filter(o=>!o.inst&&fly(o.id)&&!ex.has(o.id)&&seen.has(o.id));
   for(const o of Object.values(N)){if(seen.has(o.id)||(o.inst&&o.id!=to)||!vis(o.id))continue;
-    let h=null,hd=1/0;for(const s of hubs)if(LAND[s.id]==LAND[o.id]){const d=dist(s.id,o.id);if(d<hd){hd=d;h=s.id}}
-    if(h!=null){const c=hd*YPU/9;(g[h]||(g[h]=[])).push({b:o.id,c,kind:"walk",label:"",cost:0,t:c})}}}
+    const h=(near2(o.id,hubs.filter(s=>LAND[s.id]==LAND[o.id]),1)[0]||{}).id;
+    if(h!=null){const c=runT(h,o.id);(g[h]||(g[h]=[])).push({b:o.id,c:runC(h,o.id),kind:"walk",label:"",cost:0,t:c})}}}
 const route=o=>{const g=graph(o);let r=dijkstra(g);const ex=noFrom(o.ex);
   if(!r&&ex){runIn(g,ex);r=dijkstra(g)}return r};
 function dijkstra(g){const d={[from]:0},prev={},done=new Set();
