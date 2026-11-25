@@ -355,7 +355,6 @@ body.search .crests button[aria-pressed=true] img{filter:drop-shadow(0 0 1px #00
 /* "Not learned?" on each flight point in the directions, and the flight points left out of this trip as chips */
 .nofp{font:inherit;font-size:12.5px;color:var(--mute);background:none;border:0;padding:2px 0;margin-left:8px;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;white-space:nowrap}
 .nofp:focus-visible{color:var(--gold);text-decoration-style:solid}@media (hover:hover){.nofp:hover{color:var(--gold);text-decoration-style:solid}}
-ol.steps .t .nofp{margin-left:0}
 .avoid{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:2px 4px 6px;font-size:13.5px;color:var(--mute)}
 .avoid .chip{font:inherit;font-size:13.5px;display:inline-flex;align-items:center;gap:7px;padding:4px 9px 4px 11px;border-radius:999px;border:1px solid var(--rule);background:var(--field);color:var(--ink);cursor:pointer}
 .avoid .chip svg{color:var(--mute)}
@@ -889,7 +888,7 @@ function renderRoutes(){const box=$("routes");
     // "Not learned?" on each flight point the trip flies to or through (not the start: you learn it there)
     const no=id=>id!=from&&N[id].fp&&!avoid.has(id)?`<button class="nofp" data-no="${id}" aria-label="I haven't learned ${esc(N[id].name)}">Not learned?</button>`:"";
     const list=i==ri&&!(one&&!(st[0].via||[]).length&&!(st[0].kind=="fly"&&no(st[0].b)))?`<ol class="steps">${st.map((s,k)=>`<li${s.via&&s.via.length?' class="via"':""}><span class="num">${k+1}</span><div><span class="sic">${icon(s)}</span>${
-      s.kind=="fly"?`Fly to ${nz(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}${no(v)}</li>`).join("")}</ul>`:""}${one&&!no(s.b)?"":`<div class="t">${[one?"":fmtT(s.t)+(s.rebook?" · new flight":""),no(s.b)].filter(Boolean).join(" · ")}</div>`}`:
+      s.kind=="fly"?`Fly to ${nz(s.b)}${no(s.b)}${s.via.length?`<ul class="hops" aria-label="Flies through">${s.via.map(v=>`<li>${nm(v)}${no(v)}</li>`).join("")}</ul>`:""}${one?"":`<div class="t">${fmtT(s.t)}${s.rebook?" · new flight":""}</div>`}`:
       s.kind=="ride"?`${s.label} to ${nz(s.b)}<div class="t">5 min${s.route==LOOP?" · one-way loop":""}</div>`:
       s.kind=="tele"?(s.label==TRANSPONDER?`Teleporter to ${nz(s.b)}<div class="t">&lt;1 min</div>`:`${esc(s.label)}${s.label=="Hearthstone"?` to ${nz(s.b)}`:""}<div class="t">10 sec cast</div>`):
       `${s.label=="portal"?"Take the portal":"Run"} to ${nz(s.b)}<div class="t">${fmtT(s.t)}</div>`}</div></li>${s.stopEnd?`<li class="stopmark"><span class="smk"></span><div>Stop at ${nz(s.b)}</div></li>`:""}`).join("")}</ol>`:"";
