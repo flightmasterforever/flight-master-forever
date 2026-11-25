@@ -14,7 +14,7 @@ source/    everything needed to change and rebuild it
 
 ### docs/
 
-A static site, about 7 MB: no server code, no database, no build step needed to host it.
+A static site, about 70 MB: no server code, no database, no build step needed to host it.
 
 | File | What it is |
 |---|---|
@@ -22,6 +22,8 @@ A static site, about 7 MB: no server code, no database, no build step needed to 
 | `azeroth.jpg`, `azeroth-clean.jpg` | the world map shown at first |
 | `hires3/` | full-detail map tiles, loaded only for the part of the map in view |
 | `cities/` | capital city maps, shown when zoomed in close |
+| `zones/` | sharp close-up maps of the small zones |
+| `minimap/` | the game's own minimap terrain (land only), shown when zoomed in past the map art's detail |
 | `landmask.png`, `seamask.png`, `seatex.png`, `grain.png` | map shading |
 | `zephras-isle.webp` | Zephras Isle, drawn in the sky north of the Maelstrom |
 | `icons/` | boat, zeppelin, dungeon, raid, coin and faction icons |

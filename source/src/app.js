@@ -238,6 +238,10 @@ function draw(){
     const zq=(window.devicePixelRatio||1)/k,zop=zq>3?Math.min(1,(zq-3)/0.8)*hop:0;
     if(zop>0&&G.zart)for(const t of G.zart)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]}" height="${t[4]}" preserveAspectRatio="none" style="opacity:${zop}"/>`}
   if(k<0.42)for(const c of G.cities)if(inView(c[1],c[2],c[3],c[4]))s+=`<image href="cities/${slug(c[0])}.webp" x="${c[1]}" y="${c[2]}" width="${c[3]}" height="${c[4]}" preserveAspectRatio="none" style="opacity:${Math.min(1,(0.42-k)/0.14)}"/>`;
+  // minimap level: once the map art above runs out of detail (about 9 screen pixels a map unit), the game's own
+  // minimap terrain fades in on top (14 pixels a map unit: source/data-tools/minimap.py); only tiles on screen load
+  const mq=(window.devicePixelRatio||1)/k,mop=mq>9?Math.min(1,(mq-9)/3):0;
+  if(mop>0&&G.mini)for(const t of G.mini)if(inView(t[1],t[2],t[3],t[4]))s+=`<image href="${t[0]}" x="${t[1]}" y="${t[2]}" width="${t[3]+0.2}" height="${t[4]+0.2}" preserveAspectRatio="none" style="opacity:${mop}"/>`;
   // Zephras Isle floats in Skywall (the plane of air); Blizzard gives it no place on Azeroth, so it is drawn in the open sky north of the Maelstrom, at true scale
   // (its halo and drop shadow are baked into the picture: source/data-tools/bake-sprites.js)
   if(G.isle){const [ix,iy,iw,ih]=G.isle;s+=`<image href="isle-baked.webp" x="${ix-.3*iw}" y="${iy-.3*ih}" width="${1.6*iw}" height="${1.7*ih}" preserveAspectRatio="none"/>
@@ -592,7 +596,9 @@ $("about").onclick=e=>{if(e.target.id=="about")$("about").hidden=true};
 addEventListener("keydown",e=>{if(e.key=="Escape"){$("about").hidden=true;closePop()}});
 let drag=null,moved=false,pinch=null;const touches=new Map();
 const toSvg=(cx,cy)=>{const r=mapBox();const k=Math.max(vb.w/r.width,vb.h/r.height);const ox=(r.width*k-vb.w)/2,oy=(r.height*k-vb.h)/2;return[vb.x+(cx-r.left)*k-ox,vb.y+(cy-r.top)*k-oy,k]};
-const zoomTo=(f,cx,cy)=>{const [x,y]=toSvg(cx,cy);const nw=Math.min(maxW(),Math.max(70,vb.w*f));const s=nw/vb.w;vb={x:x-(x-vb.x)*s,y:y-(y-vb.y)*s,w:nw,h:vb.h*s}};
+// the closest zoom: a view this many map units wide (about 520 yards, one minimap tile)
+const MINW=35;
+const zoomTo=(f,cx,cy)=>{const [x,y]=toSvg(cx,cy);const nw=Math.min(maxW(),Math.max(MINW,vb.w*f));const s=nw/vb.w;vb={x:x-(x-vb.x)*s,y:y-(y-vb.y)*s,w:nw,h:vb.h*s}};
 const zoomAt=(f,cx,cy)=>{zoomTo(f,cx,cy);setVB();draw()};
 let wheelT=0;
 svg.addEventListener("wheel",e=>{e.preventDefault();liveStart();zoomTo(e.deltaY>0?1.15:1/1.15,e.clientX,e.clientY);liveShow();clearTimeout(wheelT);wheelT=setTimeout(liveEnd,180)},{passive:false});
@@ -602,7 +608,7 @@ svg.addEventListener("pointerdown",e=>{touches.set(e.pointerId,{x:e.clientX,y:e.
   if(touches.size==2){const m=pinchAt();const [x,y,k]=toSvg(m.x,m.y);pinch={d:m.d,x,y,k,vb:{...vb}};drag=null;moved=true;liveStart();return}
   if(touches.size>2)return;drag={x:e.clientX,y:e.clientY,vx:vb.x,vy:vb.y};moved=false});
 svg.addEventListener("pointermove",e=>{if(touches.has(e.pointerId))touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pinch&&touches.size>=2){const m=pinchAt(),r=mapBox();const nw=Math.min(maxW(),Math.max(70,pinch.vb.w*pinch.d/m.d)),s=nw/pinch.vb.w,k=pinch.k*s;
+  if(pinch&&touches.size>=2){const m=pinchAt(),r=mapBox();const nw=Math.min(maxW(),Math.max(MINW,pinch.vb.w*pinch.d/m.d)),s=nw/pinch.vb.w,k=pinch.k*s;
     vb={x:pinch.x-(m.x-r.left)*k,y:pinch.y-(m.y-r.top)*k,w:nw,h:pinch.vb.h*s};liveShow();return}
   if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4){moved=true;svg.classList.add("drag")}
   if(moved){liveStart();const [, ,k]=toSvg(0,0);vb.x=drag.vx-dx*k;vb.y=drag.vy-dy*k;liveShow()}});
