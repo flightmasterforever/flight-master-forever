@@ -305,7 +305,7 @@ body.search .crests img{width:30px;height:30px}
 body.search .crests button[aria-pressed=true] img{filter:drop-shadow(0 0 1px #000) drop-shadow(0 1px 2px rgba(0,0,0,.6))}}
 @media (max-width:700px){.head .close{display:none}}
 .mitlic summary{cursor:pointer;color:var(--acc,var(--gold));margin-top:4px}.mitlic pre{white-space:pre-wrap;font-size:11.5px;line-height:1.45;background:var(--tint,rgba(0,0,0,.05));padding:10px 12px;border-radius:8px;margin:6px 0 0}
-.share{display:flex;justify-content:flex-end;padding:8px 16px 0}.share .linkbtn{display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.share{display:flex;justify-content:flex-end;padding:8px 16px 0}.share[hidden]{display:none}.share .linkbtn{display:inline-flex;align-items:center;gap:6px;font-size:13px}
 
 /* phones: the panel is a bottom sheet (see "phone layout" in the app). Pulled down it shows From/To and the chosen
    route; pulled up, the steps, the other options, then your character folded into one row */
@@ -1190,10 +1190,12 @@ $("cpTog").onclick=()=>{const t=$("cpTog");t.setAttribute("aria-expanded",t.getA
     // settle on the nearest of the three heights
     const h=st.cur??st.h;glide(h>(peekH+fullH())/2?"full":h<(headH()+peekH)/2?"down":"peek",h)};
   head.addEventListener("pointerup",end);head.addEventListener("pointercancel",end);
-  $("sheetMore").onclick=()=>glide("full");
+  // with no route yet the button reads "Your character and travel extras": open those options too, not just the sheet
+  $("sheetMore").onclick=()=>{if(!(from!=null&&to!=null&&from!=to&&routes.length&&!routes[0].none))openChar(true);glide("full")};
   $("routes").addEventListener("click",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")});
   ["fromIn","toIn","hearthIn"].forEach(i=>$(i).addEventListener("focus",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")}));
-  $("charTog").onclick=()=>{const bar=$("charTog").parentNode,open=!bar.classList.contains("open");bar.classList.toggle("open",open);$("charTog").setAttribute("aria-expanded",open)};
+  const openChar=open=>{$("charTog").parentNode.classList.toggle("open",open);$("charTog").setAttribute("aria-expanded",open)};
+  $("charTog").onclick=()=>openChar(!$("charTog").parentNode.classList.contains("open"));
   phone.addEventListener("change",()=>{margins();sheet("peek");searchMode();homeView();draw()})}
 // the margins: on phones only (large enough for most drags, small enough for the phone's graphics memory)
 const margins=()=>{const on=phone.matches;OX=on?Math.round(innerWidth*.4):0;OY=on?Math.round(innerHeight*.3):0;
