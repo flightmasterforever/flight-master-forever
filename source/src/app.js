@@ -105,6 +105,10 @@ const RD=(()=>{const p=(G.roads||{p:[]}).p,e=(G.roads||{e:[]}).e,n=p.length/2,ad
   // leaving the road costs OFF times its length when choosing the way, so a run follows a road (or a traced way in) as
   // far as it goes rather than cutting across to another road nearby; the time is still the true length
   const OFF=4,plen=q=>{let L=0;for(let i=1;i<q.length;i++)L+=Math.hypot(q[i][0]-q[i-1][0],q[i][1]-q[i-1][1]);return L};
+  // where two traced roads meet a little off each other, the way can run a few units past the junction and straight
+  // back (a V); cut those corners (a turn sharper than 70 degrees with an arm under 4 units)
+  const trim=q=>{for(let k=0;k<4;k++){let cut=false;for(let i=2;i<q.length-2;i++){const a=q[i-1],b=q[i],c=q[i+1],ux=a[0]-b[0],uy=a[1]-b[1],vx=c[0]-b[0],vy=c[1]-b[1],lu=Math.hypot(ux,uy),lv=Math.hypot(vx,vy);
+      if(lu&&lv&&Math.min(lu,lv)<4&&(ux*vx+uy*vy)/(lu*lv)>0.342){q.splice(i,1);i--;cut=true}}if(!cut)break}return q};
   const cache=new Map();
   const path=(A,B)=>{const SS=near(A.x,A.y),TT=near(B.x,B.y);if(!SS.length||!TT.length)return null;
     const P=(i,j)=>Math.hypot(p[2*i]-j[3],p[2*i+1]-j[4]);let best=Infinity,res=null;
@@ -121,7 +125,7 @@ const RD=(()=>{const p=(G.roads||{p:[]}).p,e=(G.roads||{e:[]}).e,n=p.length/2,ad
       const a=adj[u];for(let i=0;i<a.length;i+=2){const v=a[i],nk=k+a[i+1];if(nk<d[v]){d[v]=nk;prev[v]=u;push(v,nk)}}}
     if(end<0)return res&&{pts:res.pts,len:plen(res.pts)};const ids=[];let u=end;for(;prev[u]>=0;u=prev[u])ids.unshift(u);ids.unshift(u);
     const S=from.get(u),T=goal.get(end)[1];
-    const pts=[[A.x,A.y],[S[3],S[4]],...ids.map(i=>[p[2*i],p[2*i+1]]),[T[3],T[4]],[B.x,B.y]];return {pts,len:plen(pts)}};
+    const pts=trim([[A.x,A.y],[S[3],S[4]],...ids.map(i=>[p[2*i],p[2*i+1]]),[T[3],T[4]],[B.x,B.y]]);return {pts,len:plen(pts)}};
   return (a,b)=>{const k=a+">"+b;if(cache.has(k))return cache.get(k);const A=N[a],B=N[b],s=Math.hypot(A.x-B.x,A.y-B.y);
     // no road joins them: a short hop is a straight line; a longer one (across the sea, between road networks that
     // never meet) can't be run at all
