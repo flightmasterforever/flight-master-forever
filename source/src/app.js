@@ -711,10 +711,12 @@ $("cpTog").onclick=()=>{const t=$("cpTog");t.setAttribute("aria-expanded",t.getA
     // settle on the nearest of the three heights
     const h=st.cur??st.h;glide(h>(peekH+fullH())/2?"full":h<(headH()+peekH)/2?"down":"peek",h)};
   head.addEventListener("pointerup",end);head.addEventListener("pointercancel",end);
-  $("sheetMore").onclick=()=>glide("full");
+  // with no route yet the button reads "Your character and travel extras": open those options too, not just the sheet
+  $("sheetMore").onclick=()=>{if(!(from!=null&&to!=null&&from!=to&&routes.length&&!routes[0].none))openChar(true);glide("full")};
   $("routes").addEventListener("click",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")});
   ["fromIn","toIn","hearthIn"].forEach(i=>$(i).addEventListener("focus",()=>{if(phone.matches&&sheetMode=="peek")sheet("full")}));
-  $("charTog").onclick=()=>{const bar=$("charTog").parentNode,open=!bar.classList.contains("open");bar.classList.toggle("open",open);$("charTog").setAttribute("aria-expanded",open)};
+  const openChar=open=>{$("charTog").parentNode.classList.toggle("open",open);$("charTog").setAttribute("aria-expanded",open)};
+  $("charTog").onclick=()=>openChar(!$("charTog").parentNode.classList.contains("open"));
   phone.addEventListener("change",()=>{margins();sheet("peek");searchMode();homeView();draw()})}
 // the margins: on phones only (large enough for most drags, small enough for the phone's graphics memory)
 const margins=()=>{const on=phone.matches;OX=on?Math.round(innerWidth*.4):0;OY=on?Math.round(innerHeight*.3):0;
