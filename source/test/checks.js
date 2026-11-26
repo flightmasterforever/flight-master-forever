@@ -188,7 +188,7 @@
   spot("H", "Orgrimmar", "Gnomeregan", has("Gnomeregan Teleporter"), { gnome: true });
   spot("A", "Auberdine", "Nighthaven", has("Ride Nighthaven"));
   spot("A", "Auberdine", "Nighthaven", has("Teleport: Moonglade"), { druid: true });
-  spot("A", "Theramore", "Southshore", has("Teleport: Dalaran"), { mage: 50 });
+  spot("A", "Theramore", "Dalaran Skydock", has("Teleport: Dalaran"), { mage: 50 });
   spot("H", "Thunder Bluff", "Orgrimmar", (r, g) => !r.none);
   spot("A", "Ironforge", "Ratchet", (r, g) => !r.none);
   spot("A", "Stormwind", "Valanaar", has("Skyship Valanaar"));
