@@ -24,7 +24,7 @@ cont = json.loads(re.search(r'"cont":(\{.*?\}),"W"', g).group(1))
 # the same transform the flight data and the minimap tiles use
 REG = {"K": [-11733.299804688, -19733.2109375, 12799.900390625, 17066.599609375],
        "E": [-16000.0, -19199.900390625, 7466.6000976562, 16000.0]}
-T = 1600 / 3; PPU = 14.0; CORR = 2.0; PFX = {"E": "e", "K": "k"}
+T = 1600 / 3; PPU = 14.0; CORR = float(os.environ.get("ROADS_CORR", 6)); PFX = {"E": "e", "K": "k"}
 
 def unit(c, X, Y):
     x0, y0, x1, y1 = REG[c]; cx, cy, cw, ch = cont[c]
@@ -61,10 +61,17 @@ def rdp(P, eps):
 
 def snap(c, P):
     D = dens(P, 0.25); us = [p[0] for p in D]; vs = [p[1] for p in D]
-    u0, v0, u1, v1 = min(us) - 3, min(vs) - 3, max(us) + 3, max(vs) + 3
+    u0, v0, u1, v1 = min(us) - CORR - 1, min(vs) - CORR - 1, max(us) + CORR + 1, max(vs) + CORR + 1
     a = np.asarray(mosaic(c, u0, v0, u1, v1)).astype(np.float32); L = a.mean(2)
     bg = np.asarray(Image.fromarray(L.astype(np.uint8)).filter(ImageFilter.GaussianBlur(PPU * 2))).astype(np.float32)
     road = np.clip((L - bg) / 14, 0, 1)
+    # roads are grey: much less coloured than the ground round them (the best sign in most zones; snow and sand are
+    # grey too, so there the lightness above does the work)
+    mx, mn = a.max(2), a.min(2); sat = (mx - mn) / (mx + 1)
+    sb = np.asarray(Image.fromarray((sat * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(PPU * 1.5))).astype(np.float32) / 255
+    lb = np.asarray(Image.fromarray(L.astype(np.uint8)).filter(ImageFilter.GaussianBlur(PPU * 1.5))).astype(np.float32)
+    grey = np.clip((sb - sat) * 6, 0, 1) * np.clip((L - lb) / 12 + 0.5, 0, 1)
+    road = np.maximum(grey, road * 0.8)
     road = np.asarray(Image.fromarray((road * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.2))).astype(np.float32) / 255
     H, W = road.shape; dist = np.full((H, W), 1e9, np.float32); yy, xx = np.mgrid[0:H, 0:W]; r = CORR * PPU
     for p in D[::2]:

@@ -93,7 +93,8 @@ let YPU=15;{const r=[];for(const e of G.edges){const p=e[4];let L=0;for(let k=2;
 const dist=(a,b)=>Math.hypot(N[a].x-N[b].x,N[a].y-N[b].y);
 // "Run to" legs follow the roads, traced over the game's own minimap (source/data-tools/roads.py): from the start to the
 // nearest road, along the roads, and off the road at the nearest point to the end. Run time is that length at 9 yd/s.
-// When the roads don't join the two places sensibly (no road between them, or a detour over 3x the straight line), it's a straight line.
+// Runs always keep to the roads, however far round they go. Places no road joins can only be run between when they're close.
+const RUN_OFFROAD=25,RUN_ACCESS=40,RUN_MAX=15;
 const RD=(()=>{const p=(G.roads||{p:[]}).p,e=(G.roads||{e:[]}).e,n=p.length/2,adj=Array.from({length:n},()=>[]);
   for(let i=0;i<e.length;i+=2){const a=e[i],b=e[i+1],w=Math.hypot(p[2*a]-p[2*b],p[2*a+1]-p[2*b+1]);adj[a].push(b,w);adj[b].push(a,w)}
   // the points on the roads near (x,y), one per stretch, nearest first: [distance, edge start, edge end, x, y].
@@ -101,31 +102,44 @@ const RD=(()=>{const p=(G.roads||{p:[]}).p,e=(G.roads||{e:[]}).e,n=p.length/2,ad
   const near=(x,y)=>{const c=[];for(let i=0;i<e.length;i+=2){const a=e[i],b=e[i+1],ax=p[2*a],ay=p[2*a+1],dx=p[2*b]-ax,dy=p[2*b+1]-ay,L=dx*dx+dy*dy||1;
     const t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/L)),qx=ax+t*dx,qy=ay+t*dy;c.push([Math.hypot(x-qx,y-qy),a,b,qx,qy])}
     c.sort((u,v)=>u[0]-v[0]);return c.filter(q=>q[0]<=c[0][0]+20).slice(0,8)};
+  // leaving the road costs OFF times its length when choosing the way, so a run follows a road (or a traced way in) as
+  // far as it goes rather than cutting across to another road nearby; the time is still the true length
+  const OFF=4,plen=q=>{let L=0;for(let i=1;i<q.length;i++)L+=Math.hypot(q[i][0]-q[i-1][0],q[i][1]-q[i-1][1]);return L};
   const cache=new Map();
   const path=(A,B)=>{const SS=near(A.x,A.y),TT=near(B.x,B.y);if(!SS.length||!TT.length)return null;
     const P=(i,j)=>Math.hypot(p[2*i]-j[3],p[2*i+1]-j[4]);let best=Infinity,res=null;
     // both ends on the same stretch of road
-    for(const S of SS)for(const T of TT)if((S[1]==T[1]&&S[2]==T[2])||(S[1]==T[2]&&S[2]==T[1])){const L=S[0]+Math.hypot(S[3]-T[3],S[4]-T[4])+T[0];
+    for(const S of SS)for(const T of TT)if((S[1]==T[1]&&S[2]==T[2])||(S[1]==T[2]&&S[2]==T[1])){const L=OFF*S[0]+Math.hypot(S[3]-T[3],S[4]-T[4])+OFF*T[0];
       if(L<best){best=L;res={pts:[[A.x,A.y],[S[3],S[4]],[T[3],T[4]],[B.x,B.y]],len:L}}}
     const d=new Float64Array(n).fill(Infinity),prev=new Int32Array(n).fill(-1),from=new Map(),h=[];
     const push=(v,k)=>{h.push([k,v]);let i=h.length-1;while(i){const q=(i-1)>>1;if(h[q][0]<=h[i][0])break;[h[q],h[i]]=[h[i],h[q]];i=q}};
     const pop=()=>{const top=h[0],last=h.pop();if(h.length){h[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<h.length&&h[l][0]<h[m][0])m=l;if(r<h.length&&h[r][0]<h[m][0])m=r;if(m==i)break;[h[m],h[i]]=[h[i],h[m]];i=m}}return top};
-    for(const S of SS)for(const v of [S[1],S[2]]){const k=S[0]+P(v,S);if(k<d[v]){d[v]=k;from.set(v,S);push(v,k)}}
-    const goal=new Map();for(const T of TT)for(const v of [T[1],T[2]]){const k=P(v,T)+T[0];if(!goal.has(v)||k<goal.get(v)[0])goal.set(v,[k,T])}
+    for(const S of SS)for(const v of [S[1],S[2]]){const k=OFF*S[0]+P(v,S);if(k<d[v]){d[v]=k;from.set(v,S);push(v,k)}}
+    const goal=new Map();for(const T of TT)for(const v of [T[1],T[2]]){const k=P(v,T)+OFF*T[0];if(!goal.has(v)||k<goal.get(v)[0])goal.set(v,[k,T])}
     let end=-1;
     while(h.length){const [k,u]=pop();if(k>d[u])continue;if(k>=best)break;if(goal.has(u)&&k+goal.get(u)[0]<best){best=k+goal.get(u)[0];end=u}
       const a=adj[u];for(let i=0;i<a.length;i+=2){const v=a[i],nk=k+a[i+1];if(nk<d[v]){d[v]=nk;prev[v]=u;push(v,nk)}}}
-    if(end<0)return res;const ids=[];let u=end;for(;prev[u]>=0;u=prev[u])ids.unshift(u);ids.unshift(u);
+    if(end<0)return res&&{pts:res.pts,len:plen(res.pts)};const ids=[];let u=end;for(;prev[u]>=0;u=prev[u])ids.unshift(u);ids.unshift(u);
     const S=from.get(u),T=goal.get(end)[1];
-    return {pts:[[A.x,A.y],[S[3],S[4]],...ids.map(i=>[p[2*i],p[2*i+1]]),[T[3],T[4]],[B.x,B.y]],len:best}};
+    const pts=[[A.x,A.y],[S[3],S[4]],...ids.map(i=>[p[2*i],p[2*i+1]]),[T[3],T[4]],[B.x,B.y]];return {pts,len:plen(pts)}};
   return (a,b)=>{const k=a+">"+b;if(cache.has(k))return cache.get(k);const A=N[a],B=N[b],s=Math.hypot(A.x-B.x,A.y-B.y);
-    let r=s<6?null:path(A,B);if(r&&r.len>3*s+10)r=null;r=r?{...r,road:true}:{pts:[[A.x,A.y],[B.x,B.y]],len:s,road:s<6};
+    // no road joins them: a short hop is a straight line; a longer one (across the sea, between road networks that
+    // never meet) can't be run at all
+    // (and a place whose nearest road is further than RUN_ACCESS can't be run to or from by road: it's across water or
+    // cliffs; the ways in that leave the road are traced as roads too. Places with no road for 150 units round, where
+    // the game has no minimap, are run between in a straight line)
+    let r=s<6?null:path(A,B);
+    if(r){const p=r.pts,n=p.length,a0=Math.hypot(p[1][0]-p[0][0],p[1][1]-p[0][1]),a1=Math.hypot(p[n-1][0]-p[n-2][0],p[n-1][1]-p[n-2][1]);
+      if(a0>150&&a1>150)r={pts:[[A.x,A.y],[B.x,B.y]],len:s};else if(Math.max(a0,a1)>RUN_ACCESS)r={pts:r.pts,len:Infinity}}
+    r=r?{...r,road:r.len<Infinity&&r.pts.length>2}:{pts:[[A.x,A.y],[B.x,B.y]],len:s<RUN_OFFROAD?s:Infinity,road:s<6};
+    // a run of more than RUN_MAX minutes is never offered: anyone would fly, ride or take a boat instead
+    if(r.len*YPU/9>RUN_MAX*60)r={...r,len:Infinity};
     cache.set(k,r);cache.set(b+">"+a,{...r,pts:[...r.pts].reverse()});return r}})();
 const runT=(a,b)=>RD(a,b).len*YPU/9;
 // choosing which nearby place to run from or to: by the real run (along the roads where they join)
 const runC=runT;
 // the k places (of list) nearest to id: the 5 nearest in a straight line, best by run first
-const near2=(id,list,k=2)=>list.filter(h=>h.id!=id).map(h=>[h,dist(id,h.id)]).sort((a,b)=>a[1]-b[1]).slice(0,5).map(x=>x[0]).sort((a,b)=>runC(id,a.id)-runC(id,b.id)).slice(0,k);
+const near2=(id,list,k=2)=>list.filter(h=>h.id!=id).map(h=>[h,dist(id,h.id)]).sort((a,b)=>a[1]-b[1]).slice(0,5).map(x=>x[0]).filter(h=>runC(id,h.id)<Infinity).sort((a,b)=>runC(id,a.id)-runC(id,b.id)).slice(0,k);
 const uniq=new Map();for(const [a,b] of EDG){const k=a<b?a+"~"+b:b+"~"+a;if(!uniq.has(k))uniq.set(k,[Math.min(a,b),Math.max(a,b)])}
 const lines=[...uniq.values()];
 const findNode=(name,f)=>Object.values(N).find(o=>o.name==name&&o.f.has(f)&&!o.druid);
@@ -355,7 +369,7 @@ function draw(){
 }
 
 // ---- routing ----
-function graph(opt){const g={},ex=noFrom(opt.ex);const add=(a,b,c,kind,label,cost,extra)=>{if(opt.ban&&opt.ban.has(a+">"+b))return;(g[a]||(g[a]=[])).push({b,c:opt.cheap?(cost||0)*10000+c:c,kind,label,cost,...extra})};
+function graph(opt){const g={},ex=noFrom(opt.ex);const add=(a,b,c,kind,label,cost,extra)=>{if(!(c<Infinity)||(opt.ban&&opt.ban.has(a+">"+b)))return;(g[a]||(g[a]=[])).push({b,c:opt.cheap?(cost||0)*10000+c:c,kind,label,cost,...extra})};
   // whole flights, booked the way the game books them (confirmed against routes recorded in game):
   // a direct flight if one exists, otherwise the shortest chain by flight-path length.
   // Landing and booking again is a separate step, so the planner can still choose it when that's faster.
