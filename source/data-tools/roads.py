@@ -150,6 +150,7 @@ for r in lines:
 # pieces of road while they are within 50 units of each other (nearest first; the gaps are where tracing stopped at the
 # edge of a view. The gap left between the north and south of the Eastern Kingdoms, about 60 units, is real: Searing Gorge's
 # gate to Loch Modan is locked)
+JOIN = float(os.environ.get("ROADS_JOIN", 10))
 def pieces():
     comp = {}
     for s0 in E:
@@ -164,9 +165,10 @@ while True:
     comp = pieces(); ids = list(E); A = np.array([P[i] for i in ids]); C = np.array([comp[i] for i in ids]); best = None
     for k, i in enumerate(ids):
         d = np.hypot(*(A - A[k]).T); d[C == C[k]] = 1e9; j = int(d.argmin())
-        if d[j] < 50 and (best is None or d[j] < best[0]): best = (d[j], i, ids[j])
+        if d[j] < JOIN and (best is None or d[j] < best[0]): best = (d[j], i, ids[j])
     if not best: break
     link(best[1], best[2])
+    if os.environ.get("ROADS_DEBUG"): print("join", round(best[0], 1), P[best[1]], P[best[2]])
 used = sorted(E); idx = {o: k for k, o in enumerate(used)}
 pts = [round(v, 1) for o in used for v in P[o]]
 edges = sorted({(min(idx[a], idx[b]), max(idx[a], idx[b])) for a in E for b in E[a]})
